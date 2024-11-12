@@ -14,6 +14,13 @@ docker-build:
 docker-push:
 	docker push $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 
+.PHONY: generate
+generate:
+	hack/update-codegen.sh
+
+.PHONY: verify
+verify:
+	hack/verify-codegen.sh
 
 .PHONY: test
 test:
