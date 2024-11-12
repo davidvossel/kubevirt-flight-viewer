@@ -1,0 +1,77 @@
+apiVersion: v1
+imagePullSecrets:
+- name: kubevirt-flight-viewer
+kind: ServiceAccount
+metadata:
+  name: kubevirt-flight-viewer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cdi-apiserver
+rules:
+- apiGroups:
+  - kubevirt.io
+  resources:
+  - '*'
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubevirt-flight-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubevirt-flight-viewer
+subjects:
+- kind: ServiceAccount
+  name: kubevirt-flight-viewer
+  namespace: openshift-cnv
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubevirt-flight-viewer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubevirt-flight-viewer
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+      labels:
+        app: kubevirt-flight-viewer
+    spec:
+      containers:
+      - image: quay.io/dvossel/kubevirt-flight-viewer:latest
+        imagePullPolicy: Always
+        name: kubevirt-flight-viewer
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 150Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+      restartPolicy: Always
+      securityContext:
+        runAsNonRoot: true
+      serviceAccount: kubevirt-flight-viewer
+      serviceAccountName: kubevirt-flight-viewer
