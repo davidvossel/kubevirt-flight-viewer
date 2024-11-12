@@ -1,6 +1,6 @@
 // This is a generated file. Do not edit directly.
 
-module k8s.io/sample-controller
+module k8s.io/kubevirt-flight-viewer
 
 go 1.23.2
 

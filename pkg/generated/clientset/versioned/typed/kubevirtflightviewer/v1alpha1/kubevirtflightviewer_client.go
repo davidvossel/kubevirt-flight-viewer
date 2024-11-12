@@ -22,28 +22,28 @@ import (
 	http "net/http"
 
 	rest "k8s.io/client-go/rest"
-	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
+	kubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	scheme "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/scheme"
 )
 
-type SamplecontrollerV1alpha1Interface interface {
+type KubevirtflightviewerV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	FoosGetter
 }
 
-// SamplecontrollerV1alpha1Client is used to interact with features provided by the samplecontroller.k8s.io group.
-type SamplecontrollerV1alpha1Client struct {
+// KubevirtflightviewerV1alpha1Client is used to interact with features provided by the kubevirtflightviewer.k8s.io group.
+type KubevirtflightviewerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *SamplecontrollerV1alpha1Client) Foos(namespace string) FooInterface {
+func (c *KubevirtflightviewerV1alpha1Client) Foos(namespace string) FooInterface {
 	return newFoos(c, namespace)
 }
 
-// NewForConfig creates a new SamplecontrollerV1alpha1Client for the given config.
+// NewForConfig creates a new KubevirtflightviewerV1alpha1Client for the given config.
 // NewForConfig is equivalent to NewForConfigAndClient(c, httpClient),
 // where httpClient was generated with rest.HTTPClientFor(c).
-func NewForConfig(c *rest.Config) (*SamplecontrollerV1alpha1Client, error) {
+func NewForConfig(c *rest.Config) (*KubevirtflightviewerV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -55,9 +55,9 @@ func NewForConfig(c *rest.Config) (*SamplecontrollerV1alpha1Client, error) {
 	return NewForConfigAndClient(&config, httpClient)
 }
 
-// NewForConfigAndClient creates a new SamplecontrollerV1alpha1Client for the given config and http client.
+// NewForConfigAndClient creates a new KubevirtflightviewerV1alpha1Client for the given config and http client.
 // Note the http client provided takes precedence over the configured transport values.
-func NewForConfigAndClient(c *rest.Config, h *http.Client) (*SamplecontrollerV1alpha1Client, error) {
+func NewForConfigAndClient(c *rest.Config, h *http.Client) (*KubevirtflightviewerV1alpha1Client, error) {
 	config := *c
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
@@ -66,12 +66,12 @@ func NewForConfigAndClient(c *rest.Config, h *http.Client) (*SamplecontrollerV1a
 	if err != nil {
 		return nil, err
 	}
-	return &SamplecontrollerV1alpha1Client{client}, nil
+	return &KubevirtflightviewerV1alpha1Client{client}, nil
 }
 
-// NewForConfigOrDie creates a new SamplecontrollerV1alpha1Client for the given config and
+// NewForConfigOrDie creates a new KubevirtflightviewerV1alpha1Client for the given config and
 // panics if there is an error in the config.
-func NewForConfigOrDie(c *rest.Config) *SamplecontrollerV1alpha1Client {
+func NewForConfigOrDie(c *rest.Config) *KubevirtflightviewerV1alpha1Client {
 	client, err := NewForConfig(c)
 	if err != nil {
 		panic(err)
@@ -79,13 +79,13 @@ func NewForConfigOrDie(c *rest.Config) *SamplecontrollerV1alpha1Client {
 	return client
 }
 
-// New creates a new SamplecontrollerV1alpha1Client for the given RESTClient.
-func New(c rest.Interface) *SamplecontrollerV1alpha1Client {
-	return &SamplecontrollerV1alpha1Client{c}
+// New creates a new KubevirtflightviewerV1alpha1Client for the given RESTClient.
+func New(c rest.Interface) *KubevirtflightviewerV1alpha1Client {
+	return &KubevirtflightviewerV1alpha1Client{c}
 }
 
 func setConfigDefaults(config *rest.Config) error {
-	gv := samplecontrollerv1alpha1.SchemeGroupVersion
+	gv := kubevirtflightviewerv1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
 	config.NegotiatedSerializer = rest.CodecFactoryForGeneratedClient(scheme.Scheme, scheme.Codecs).WithoutConversion()
@@ -99,7 +99,7 @@ func setConfigDefaults(config *rest.Config) error {
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *SamplecontrollerV1alpha1Client) RESTClient() rest.Interface {
+func (c *KubevirtflightviewerV1alpha1Client) RESTClient() rest.Interface {
 	if c == nil {
 		return nil
 	}

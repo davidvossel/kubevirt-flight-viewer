@@ -26,17 +26,17 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
-	apissamplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
+	apiskubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	versioned "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
+	internalinterfaces "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions/internalinterfaces"
+	kubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/generated/listers/kubevirtflightviewer/v1alpha1"
 )
 
 // FooInformer provides access to a shared informer and lister for
 // Foos.
 type FooInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() samplecontrollerv1alpha1.FooLister
+	Lister() kubevirtflightviewerv1alpha1.FooLister
 }
 
 type fooInformer struct {
@@ -62,16 +62,16 @@ func NewFilteredFooInformer(client versioned.Interface, namespace string, resync
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SamplecontrollerV1alpha1().Foos(namespace).List(context.TODO(), options)
+				return client.KubevirtflightviewerV1alpha1().Foos(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.SamplecontrollerV1alpha1().Foos(namespace).Watch(context.TODO(), options)
+				return client.KubevirtflightviewerV1alpha1().Foos(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apissamplecontrollerv1alpha1.Foo{},
+		&apiskubevirtflightviewerv1alpha1.Foo{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,9 +82,9 @@ func (f *fooInformer) defaultInformer(client versioned.Interface, resyncPeriod t
 }
 
 func (f *fooInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apissamplecontrollerv1alpha1.Foo{}, f.defaultInformer)
+	return f.factory.InformerFor(&apiskubevirtflightviewerv1alpha1.Foo{}, f.defaultInformer)
 }
 
-func (f *fooInformer) Lister() samplecontrollerv1alpha1.FooLister {
-	return samplecontrollerv1alpha1.NewFooLister(f.Informer().GetIndexer())
+func (f *fooInformer) Lister() kubevirtflightviewerv1alpha1.FooLister {
+	return kubevirtflightviewerv1alpha1.NewFooLister(f.Informer().GetIndexer())
 }

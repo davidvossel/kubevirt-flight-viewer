@@ -39,14 +39,14 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	samplev1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	clientset "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	samplescheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
-	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions/samplecontroller/v1alpha1"
-	listers "k8s.io/sample-controller/pkg/generated/listers/samplecontroller/v1alpha1"
+	flightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
+	flightviewerscheme "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/scheme"
+	informers "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions/kubevirtflightviewer/v1alpha1"
+	listers "k8s.io/kubevirt-flight-viewer/pkg/generated/listers/kubevirtflightviewer/v1alpha1"
 )
 
-const controllerAgentName = "sample-controller"
+const controllerAgentName = "kubevirt-flight-viewer"
 
 const (
 	// SuccessSynced is used as part of the Event 'reason' when a Foo is synced
@@ -69,8 +69,8 @@ const (
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
-	// sampleclientset is a clientset for our own API group
-	sampleclientset clientset.Interface
+	// flightviewerclientset is a clientset for our own API group
+	flightviewerclientset clientset.Interface
 
 	deploymentsLister appslisters.DeploymentLister
 	deploymentsSynced cache.InformerSynced
@@ -88,19 +88,19 @@ type Controller struct {
 	recorder record.EventRecorder
 }
 
-// NewController returns a new sample controller
+// NewController returns a new flightviewer controller
 func NewController(
 	ctx context.Context,
 	kubeclientset kubernetes.Interface,
-	sampleclientset clientset.Interface,
+	flightviewerclientset clientset.Interface,
 	deploymentInformer appsinformers.DeploymentInformer,
 	fooInformer informers.FooInformer) *Controller {
 	logger := klog.FromContext(ctx)
 
 	// Create event broadcaster
-	// Add sample-controller types to the default Kubernetes Scheme so Events can be
-	// logged for sample-controller types.
-	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
+	// Add kubevirt-flight-viewer types to the default Kubernetes Scheme so Events can be
+	// logged for kubevirt-flight-viewer types.
+	utilruntime.Must(flightviewerscheme.AddToScheme(scheme.Scheme))
 	logger.V(4).Info("Creating event broadcaster")
 
 	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
@@ -113,14 +113,14 @@ func NewController(
 	)
 
 	controller := &Controller{
-		kubeclientset:     kubeclientset,
-		sampleclientset:   sampleclientset,
-		deploymentsLister: deploymentInformer.Lister(),
-		deploymentsSynced: deploymentInformer.Informer().HasSynced,
-		foosLister:        fooInformer.Lister(),
-		foosSynced:        fooInformer.Informer().HasSynced,
-		workqueue:         workqueue.NewTypedRateLimitingQueue(ratelimiter),
-		recorder:          recorder,
+		kubeclientset:         kubeclientset,
+		flightviewerclientset: flightviewerclientset,
+		deploymentsLister:     deploymentInformer.Lister(),
+		deploymentsSynced:     deploymentInformer.Informer().HasSynced,
+		foosLister:            fooInformer.Lister(),
+		foosSynced:            fooInformer.Informer().HasSynced,
+		workqueue:             workqueue.NewTypedRateLimitingQueue(ratelimiter),
+		recorder:              recorder,
 	}
 
 	logger.Info("Setting up event handlers")
@@ -311,7 +311,7 @@ func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName
 	return nil
 }
 
-func (c *Controller) updateFooStatus(ctx context.Context, foo *samplev1alpha1.Foo, deployment *appsv1.Deployment) error {
+func (c *Controller) updateFooStatus(ctx context.Context, foo *flightviewerv1alpha1.Foo, deployment *appsv1.Deployment) error {
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
@@ -321,7 +321,7 @@ func (c *Controller) updateFooStatus(ctx context.Context, foo *samplev1alpha1.Fo
 	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
-	_, err := c.sampleclientset.SamplecontrollerV1alpha1().Foos(foo.Namespace).UpdateStatus(ctx, fooCopy, metav1.UpdateOptions{FieldManager: FieldManager})
+	_, err := c.flightviewerclientset.KubevirtflightviewerV1alpha1().Foos(foo.Namespace).UpdateStatus(ctx, fooCopy, metav1.UpdateOptions{FieldManager: FieldManager})
 	return err
 }
 
@@ -385,7 +385,7 @@ func (c *Controller) handleObject(obj interface{}) {
 // newDeployment creates a new Deployment for a Foo resource. It also sets
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
-func newDeployment(foo *samplev1alpha1.Foo) *appsv1.Deployment {
+func newDeployment(foo *flightviewerv1alpha1.Foo) *appsv1.Deployment {
 	labels := map[string]string{
 		"app":        "nginx",
 		"controller": foo.Name,
@@ -395,7 +395,7 @@ func newDeployment(foo *samplev1alpha1.Foo) *appsv1.Deployment {
 			Name:      foo.Spec.DeploymentName,
 			Namespace: foo.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(foo, samplev1alpha1.SchemeGroupVersion.WithKind("Foo")),
+				*metav1.NewControllerRef(foo, flightviewerv1alpha1.SchemeGroupVersion.WithKind("Foo")),
 			},
 		},
 		Spec: appsv1.DeploymentSpec{
