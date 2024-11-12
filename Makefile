@@ -8,11 +8,11 @@ build:
 
 .PHONY: docker-build
 docker-build:
-	docker build . -t $(IMAGE_NAME):$(TAG) --file Dockerfile
+	docker build . -t $(REGISTRY)/$(IMAGE_NAME):$(TAG) --file Dockerfile
 
 .PHONY: docker-push
 docker-push:
-	docker push $(IMAGE_NAME):$(TAG)
+	docker push $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 
 
 .PHONY: test
