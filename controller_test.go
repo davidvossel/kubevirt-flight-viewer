@@ -35,9 +35,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2/ktesting"
 
-	samplecontroller "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	"k8s.io/sample-controller/pkg/generated/clientset/versioned/fake"
-	informers "k8s.io/sample-controller/pkg/generated/informers/externalversions"
+	samplecontroller "k8s.io/kubevirt-flight-viewer/pkg/apis/samplecontroller/v1alpha1"
+	"k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/fake"
+	informers "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions"
 )
 
 var (
@@ -91,14 +91,14 @@ func (f *fixture) newController(ctx context.Context) (*Controller, informers.Sha
 	k8sI := kubeinformers.NewSharedInformerFactory(f.kubeclient, noResyncPeriodFunc())
 
 	c := NewController(ctx, f.kubeclient, f.client,
-		k8sI.Apps().V1().Deployments(), i.Samplecontroller().V1alpha1().Foos())
+		k8sI.Apps().V1().Deployments(), i.Kubevirtflightviewer().V1alpha1().Foos())
 
 	c.foosSynced = alwaysReady
 	c.deploymentsSynced = alwaysReady
 	c.recorder = &record.FakeRecorder{}
 
 	for _, f := range f.fooLister {
-		i.Samplecontroller().V1alpha1().Foos().Informer().GetIndexer().Add(f)
+		i.Kubevirtflightviewer().V1alpha1().Foos().Informer().GetIndexer().Add(f)
 	}
 
 	for _, d := range f.deploymentLister {

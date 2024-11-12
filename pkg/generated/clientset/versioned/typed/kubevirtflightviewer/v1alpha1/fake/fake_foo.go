@@ -20,17 +20,17 @@ package fake
 
 import (
 	gentype "k8s.io/client-go/gentype"
-	v1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/generated/clientset/versioned/typed/samplecontroller/v1alpha1"
+	v1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	kubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/typed/kubevirtflightviewer/v1alpha1"
 )
 
 // fakeFoos implements FooInterface
 type fakeFoos struct {
 	*gentype.FakeClientWithList[*v1alpha1.Foo, *v1alpha1.FooList]
-	Fake *FakeSamplecontrollerV1alpha1
+	Fake *FakeKubevirtflightviewerV1alpha1
 }
 
-func newFakeFoos(fake *FakeSamplecontrollerV1alpha1, namespace string) samplecontrollerv1alpha1.FooInterface {
+func newFakeFoos(fake *FakeKubevirtflightviewerV1alpha1, namespace string) kubevirtflightviewerv1alpha1.FooInterface {
 	return &fakeFoos{
 		gentype.NewFakeClientWithList[*v1alpha1.Foo, *v1alpha1.FooList](
 			fake.Fake,

@@ -25,8 +25,8 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
-	samplecontrollerv1alpha1 "k8s.io/sample-controller/pkg/apis/samplecontroller/v1alpha1"
-	scheme "k8s.io/sample-controller/pkg/generated/clientset/versioned/scheme"
+	kubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	scheme "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/scheme"
 )
 
 // FoosGetter has a method to return a FooInterface.
@@ -37,34 +37,34 @@ type FoosGetter interface {
 
 // FooInterface has methods to work with Foo resources.
 type FooInterface interface {
-	Create(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.CreateOptions) (*samplecontrollerv1alpha1.Foo, error)
-	Update(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.UpdateOptions) (*samplecontrollerv1alpha1.Foo, error)
+	Create(ctx context.Context, foo *kubevirtflightviewerv1alpha1.Foo, opts v1.CreateOptions) (*kubevirtflightviewerv1alpha1.Foo, error)
+	Update(ctx context.Context, foo *kubevirtflightviewerv1alpha1.Foo, opts v1.UpdateOptions) (*kubevirtflightviewerv1alpha1.Foo, error)
 	// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-	UpdateStatus(ctx context.Context, foo *samplecontrollerv1alpha1.Foo, opts v1.UpdateOptions) (*samplecontrollerv1alpha1.Foo, error)
+	UpdateStatus(ctx context.Context, foo *kubevirtflightviewerv1alpha1.Foo, opts v1.UpdateOptions) (*kubevirtflightviewerv1alpha1.Foo, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
-	Get(ctx context.Context, name string, opts v1.GetOptions) (*samplecontrollerv1alpha1.Foo, error)
-	List(ctx context.Context, opts v1.ListOptions) (*samplecontrollerv1alpha1.FooList, error)
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*kubevirtflightviewerv1alpha1.Foo, error)
+	List(ctx context.Context, opts v1.ListOptions) (*kubevirtflightviewerv1alpha1.FooList, error)
 	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
-	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *samplecontrollerv1alpha1.Foo, err error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *kubevirtflightviewerv1alpha1.Foo, err error)
 	FooExpansion
 }
 
 // foos implements FooInterface
 type foos struct {
-	*gentype.ClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList]
+	*gentype.ClientWithList[*kubevirtflightviewerv1alpha1.Foo, *kubevirtflightviewerv1alpha1.FooList]
 }
 
 // newFoos returns a Foos
-func newFoos(c *SamplecontrollerV1alpha1Client, namespace string) *foos {
+func newFoos(c *KubevirtflightviewerV1alpha1Client, namespace string) *foos {
 	return &foos{
-		gentype.NewClientWithList[*samplecontrollerv1alpha1.Foo, *samplecontrollerv1alpha1.FooList](
+		gentype.NewClientWithList[*kubevirtflightviewerv1alpha1.Foo, *kubevirtflightviewerv1alpha1.FooList](
 			"foos",
 			c.RESTClient(),
 			scheme.ParameterCodec,
 			namespace,
-			func() *samplecontrollerv1alpha1.Foo { return &samplecontrollerv1alpha1.Foo{} },
-			func() *samplecontrollerv1alpha1.FooList { return &samplecontrollerv1alpha1.FooList{} },
+			func() *kubevirtflightviewerv1alpha1.Foo { return &kubevirtflightviewerv1alpha1.Foo{} },
+			func() *kubevirtflightviewerv1alpha1.FooList { return &kubevirtflightviewerv1alpha1.FooList{} },
 		),
 	}
 }

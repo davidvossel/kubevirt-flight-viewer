@@ -27,9 +27,9 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
-	versioned "k8s.io/sample-controller/pkg/generated/clientset/versioned"
-	internalinterfaces "k8s.io/sample-controller/pkg/generated/informers/externalversions/internalinterfaces"
-	samplecontroller "k8s.io/sample-controller/pkg/generated/informers/externalversions/samplecontroller"
+	versioned "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
+	internalinterfaces "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions/internalinterfaces"
+	kubevirtflightviewer "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions/kubevirtflightviewer"
 )
 
 // SharedInformerOption defines the functional option type for SharedInformerFactory.
@@ -254,9 +254,9 @@ type SharedInformerFactory interface {
 	// client.
 	InformerFor(obj runtime.Object, newFunc internalinterfaces.NewInformerFunc) cache.SharedIndexInformer
 
-	Samplecontroller() samplecontroller.Interface
+	Kubevirtflightviewer() kubevirtflightviewer.Interface
 }
 
-func (f *sharedInformerFactory) Samplecontroller() samplecontroller.Interface {
-	return samplecontroller.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Kubevirtflightviewer() kubevirtflightviewer.Interface {
+	return kubevirtflightviewer.New(f, f.namespace, f.tweakListOptions)
 }

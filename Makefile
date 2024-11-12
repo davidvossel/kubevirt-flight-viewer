@@ -4,7 +4,7 @@ IMAGE_NAME ?= kubevirt-flight-viewer
 
 .PHONY: build
 build:
-	go build -o kubevirt-flight-viewer main.go
+	go build .
 
 .PHONY: docker-build
 docker-build:
