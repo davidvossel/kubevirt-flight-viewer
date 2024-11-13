@@ -18,15 +18,12 @@ package main
 
 import (
 	"flag"
-	"time"
 
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/kubevirt-flight-viewer/pkg/signals"
 
-	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
-	informers "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions"
+	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 )
 
 var (
@@ -48,31 +45,7 @@ func main() {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		logger.Error(err, "Error building kubernetes clientset")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-
-	kvViewerClient, err := clientset.NewForConfig(cfg)
-	if err != nil {
-		logger.Error(err, "Error building kubernetes clientset")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
-
-	//kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, time.Second*30)
-
-	controller := NewController(ctx, kubeClient, kvViewerClient,
-		kvViewerInformerFactory.Kubevirtflightviewer().V1alpha1().InFlightOperations())
-
-	//kubeInformerFactory.Start(ctx.Done())
-	kvViewerInformerFactory.Start(ctx.Done())
-
-	if err = controller.Run(ctx, 2); err != nil {
-		logger.Error(err, "Error running controller")
-		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
-	}
+	controllers.Bootstrap(ctx, cfg)
 }
 
 func init() {
