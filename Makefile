@@ -2,6 +2,11 @@ REGISTRY ?= quay.io/dvossel
 TAG ?= latest
 IMAGE_NAME ?= kubevirt-flight-viewer
 
+TOOLS_DIR := hack/tools                                                                                             
+TOOLS_BIN_DIR := $(TOOLS_DIR)/bin  
+
+CONTROLLER_GEN := $(abspath $(TOOLS_BIN_DIR)/controller-gen)
+
 .PHONY: build
 build:
 	go build .

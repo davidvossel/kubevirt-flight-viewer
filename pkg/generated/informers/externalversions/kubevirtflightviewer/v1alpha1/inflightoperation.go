@@ -32,59 +32,59 @@ import (
 	kubevirtflightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/generated/listers/kubevirtflightviewer/v1alpha1"
 )
 
-// FooInformer provides access to a shared informer and lister for
-// Foos.
-type FooInformer interface {
+// InFlightOperationInformer provides access to a shared informer and lister for
+// InFlightOperations.
+type InFlightOperationInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() kubevirtflightviewerv1alpha1.FooLister
+	Lister() kubevirtflightviewerv1alpha1.InFlightOperationLister
 }
 
-type fooInformer struct {
+type inFlightOperationInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 	namespace        string
 }
 
-// NewFooInformer constructs a new informer for Foo type.
+// NewInFlightOperationInformer constructs a new informer for InFlightOperation type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredFooInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewInFlightOperationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredInFlightOperationInformer(client, namespace, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredFooInformer constructs a new informer for Foo type.
+// NewFilteredInFlightOperationInformer constructs a new informer for InFlightOperation type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredFooInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredInFlightOperationInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KubevirtflightviewerV1alpha1().Foos(namespace).List(context.TODO(), options)
+				return client.KubevirtflightviewerV1alpha1().InFlightOperations(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.KubevirtflightviewerV1alpha1().Foos(namespace).Watch(context.TODO(), options)
+				return client.KubevirtflightviewerV1alpha1().InFlightOperations(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&apiskubevirtflightviewerv1alpha1.Foo{},
+		&apiskubevirtflightviewerv1alpha1.InFlightOperation{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *fooInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredFooInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *inFlightOperationInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredInFlightOperationInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *fooInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&apiskubevirtflightviewerv1alpha1.Foo{}, f.defaultInformer)
+func (f *inFlightOperationInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&apiskubevirtflightviewerv1alpha1.InFlightOperation{}, f.defaultInformer)
 }
 
-func (f *fooInformer) Lister() kubevirtflightviewerv1alpha1.FooLister {
-	return kubevirtflightviewerv1alpha1.NewFooLister(f.Informer().GetIndexer())
+func (f *inFlightOperationInformer) Lister() kubevirtflightviewerv1alpha1.InFlightOperationLister {
+	return kubevirtflightviewerv1alpha1.NewInFlightOperationLister(f.Informer().GetIndexer())
 }

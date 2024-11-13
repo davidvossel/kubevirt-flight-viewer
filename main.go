@@ -20,7 +20,6 @@ import (
 	"flag"
 	"time"
 
-	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
@@ -55,23 +54,20 @@ func main() {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	exampleClient, err := clientset.NewForConfig(cfg)
+	kvViewerClient, err := clientset.NewForConfig(cfg)
 	if err != nil {
 		logger.Error(err, "Error building kubernetes clientset")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
-	exampleInformerFactory := informers.NewSharedInformerFactory(exampleClient, time.Second*30)
+	//kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, time.Second*30)
 
-	controller := NewController(ctx, kubeClient, exampleClient,
-		kubeInformerFactory.Apps().V1().Deployments(),
-		exampleInformerFactory.Kubevirtflightviewer().V1alpha1().Foos())
+	controller := NewController(ctx, kubeClient, kvViewerClient,
+		kvViewerInformerFactory.Kubevirtflightviewer().V1alpha1().InFlightOperations())
 
-	// notice that there is no need to run Start methods in a separate goroutine. (i.e. go kubeInformerFactory.Start(ctx.done())
-	// Start method is non-blocking and runs all registered informers in a dedicated goroutine.
-	kubeInformerFactory.Start(ctx.Done())
-	exampleInformerFactory.Start(ctx.Done())
+	//kubeInformerFactory.Start(ctx.Done())
+	kvViewerInformerFactory.Start(ctx.Done())
 
 	if err = controller.Run(ctx, 2); err != nil {
 		logger.Error(err, "Error running controller")

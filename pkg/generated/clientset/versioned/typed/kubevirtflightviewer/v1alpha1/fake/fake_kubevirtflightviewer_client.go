@@ -28,8 +28,8 @@ type FakeKubevirtflightviewerV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeKubevirtflightviewerV1alpha1) Foos(namespace string) v1alpha1.FooInterface {
-	return newFakeFoos(c, namespace)
+func (c *FakeKubevirtflightviewerV1alpha1) InFlightOperations(namespace string) v1alpha1.InFlightOperationInterface {
+	return newFakeInFlightOperations(c, namespace)
 }
 
 // RESTClient returns a RESTClient that is used to communicate

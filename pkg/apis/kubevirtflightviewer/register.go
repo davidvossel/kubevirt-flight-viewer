@@ -18,5 +18,5 @@ package kubevirtflightviewer
 
 // GroupName is the group name used in this package
 const (
-	GroupName = "kubevirtflightviewer.k8s.io"
+	GroupName = "kubevirtflightviewer.kubevirt.io"
 )

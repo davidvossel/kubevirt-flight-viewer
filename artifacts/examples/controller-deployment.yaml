@@ -24,7 +24,7 @@ rules:
   verbs:
   - '*'
 - apiGroups:
-  - kubevirtflightviewer.k8s.io
+  - kubevirtflightviewer.kubevirt.io
   resources:
   - '*'
   verbs:

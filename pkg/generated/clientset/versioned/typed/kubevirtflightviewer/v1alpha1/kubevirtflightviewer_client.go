@@ -28,16 +28,16 @@ import (
 
 type KubevirtflightviewerV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	FoosGetter
+	InFlightOperationsGetter
 }
 
-// KubevirtflightviewerV1alpha1Client is used to interact with features provided by the kubevirtflightviewer.k8s.io group.
+// KubevirtflightviewerV1alpha1Client is used to interact with features provided by the kubevirtflightviewer.kubevirt.io group.
 type KubevirtflightviewerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *KubevirtflightviewerV1alpha1Client) Foos(namespace string) FooInterface {
-	return newFoos(c, namespace)
+func (c *KubevirtflightviewerV1alpha1Client) InFlightOperations(namespace string) InFlightOperationInterface {
+	return newInFlightOperations(c, namespace)
 }
 
 // NewForConfig creates a new KubevirtflightviewerV1alpha1Client for the given config.

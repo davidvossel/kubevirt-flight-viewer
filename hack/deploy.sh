@@ -1,4 +1,4 @@
 #!/bin/bash
 
-kubectl apply -f artifacts/examples/crd-status-subresource.yaml
+kubectl apply -f artifacts/examples/kubevirtflightviewer.kubevirt.io_inflightoperations.yaml
 kubectl apply -f artifacts/examples/controller-deployment.yaml 
