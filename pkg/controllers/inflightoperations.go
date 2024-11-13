@@ -62,6 +62,27 @@ const (
 	FieldManager = controllerAgentName
 )
 
+type InFlightOperationRegistration interface {
+	ProcessOperation(context.Context, interface{}, []*flightviewerv1alpha1.InFlightOperation)
+}
+
+var registrations map[string]registrationObj
+
+type registrationObj struct {
+	operationName string
+	resource      string
+	registration  InFlightOperationRegistration
+}
+
+func RegisterOperation(registration InFlightOperationRegistration, operationName string, resource string) error {
+	registrations[operationName] = registrationObj{
+		operationName: operationName,
+		resource:      resource,
+		registration:  registration,
+	}
+	return nil
+}
+
 // Controller is the controller implementation for InFlightOperation resources
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
@@ -71,6 +92,8 @@ type Controller struct {
 
 	inflightOperationsLister listers.InFlightOperationLister
 	inflightOperationsSynced cache.InformerSynced
+
+	resourceInformers map[string]cache.SharedIndexInformer
 
 	// workqueue is a rate limited work queue. This is used to queue work to be
 	// processed instead of performing it as soon as a change happens. This
@@ -88,7 +111,8 @@ func NewController(
 	ctx context.Context,
 	kubeclientset kubernetes.Interface,
 	flightviewerclientset clientset.Interface,
-	inflightOperationInformer informers.InFlightOperationInformer) *Controller {
+	inflightOperationInformer informers.InFlightOperationInformer,
+	resourceInformers map[string]cache.SharedIndexInformer) *Controller {
 	logger := klog.FromContext(ctx)
 
 	// Create event broadcaster
