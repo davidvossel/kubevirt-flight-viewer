@@ -24,7 +24,6 @@ import (
 	"golang.org/x/time/rate"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -70,14 +69,14 @@ var registrations map[string]registrationObj
 
 type registrationObj struct {
 	operationName string
-	resource      string
+	resourceType  string
 	registration  InFlightOperationRegistration
 }
 
-func RegisterOperation(registration InFlightOperationRegistration, operationName string, resource string) error {
+func RegisterOperation(registration InFlightOperationRegistration, operationName string, resourceType string) error {
 	registrations[operationName] = registrationObj{
 		operationName: operationName,
-		resource:      resource,
+		resourceType:  resourceType,
 		registration:  registration,
 	}
 	return nil
@@ -95,14 +94,8 @@ type Controller struct {
 
 	resourceInformers map[string]cache.SharedIndexInformer
 
-	// workqueue is a rate limited work queue. This is used to queue work to be
-	// processed instead of performing it as soon as a change happens. This
-	// means we can ensure we only process a fixed amount of resources at a
-	// time, and makes it easy to ensure we are never processing the same item
-	// simultaneously in two different workers.
-	workqueue workqueue.TypedRateLimitingInterface[cache.ObjectName]
-	// recorder is an event recorder for recording Event resources to the
-	// Kubernetes API.
+	workqueue workqueue.RateLimitingInterface
+
 	recorder record.EventRecorder
 
 	logger klog.Logger
@@ -175,9 +168,10 @@ func NewController(
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: kubeclientset.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
-	ratelimiter := workqueue.NewTypedMaxOfRateLimiter(
-		workqueue.NewTypedItemExponentialFailureRateLimiter[cache.ObjectName](5*time.Millisecond, 1000*time.Second),
-		&workqueue.TypedBucketRateLimiter[cache.ObjectName]{Limiter: rate.NewLimiter(rate.Limit(50), 300)},
+
+	ratelimiter := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(5*time.Second, 1000*time.Second),
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Every(5*time.Second), 1)},
 	)
 
 	controller := &Controller{
@@ -185,19 +179,21 @@ func NewController(
 		flightviewerclientset:    flightviewerclientset,
 		inflightOperationsLister: inflightOperationInformer.Lister(),
 		inflightOperationsSynced: inflightOperationInformer.Informer().HasSynced,
-		workqueue:                workqueue.NewTypedRateLimitingQueue(ratelimiter),
+		workqueue:                workqueue.NewNamedRateLimitingQueue(ratelimiter, "kubevirt-inflight-operation"),
 		recorder:                 recorder,
 		logger:                   logger,
 	}
 
 	logger.Info("Setting up event handlers")
 	// Set up an event handler for when InFlightOperation resources change
-	inflightOperationInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: controller.enqueueInFlightOperation,
-		UpdateFunc: func(old, new interface{}) {
-			controller.enqueueInFlightOperation(new)
-		},
-	})
+	/*
+		inflightOperationInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: controller.enqueueInFlightOperation,
+			UpdateFunc: func(old, new interface{}) {
+				controller.enqueueInFlightOperation(new)
+			},
+		})
+	*/
 
 	for resourceType, informer := range resourceInformers {
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -265,9 +261,9 @@ func (c *Controller) runWorker(ctx context.Context) {
 }
 
 // processNextWorkItem will read a single work item off the workqueue and
-// attempt to process it, by calling the syncHandler.
+// attempt to process it, by calling the reconcile.
 func (c *Controller) processNextWorkItem(ctx context.Context) bool {
-	objRef, shutdown := c.workqueue.Get()
+	key, shutdown := c.workqueue.Get()
 
 	if shutdown {
 		return false
@@ -279,55 +275,57 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	// not call Forget if a transient error occurs, instead the item is
 	// put back on the workqueue and attempted again after a back-off
 	// period.
-	defer c.workqueue.Done(objRef)
+	defer c.workqueue.Done(key)
 
-	// Run the syncHandler, passing it the structured reference to the object to be synced.
-	err := c.syncHandler(ctx, objRef)
+	// Run the reconcile, passing it the structured reference to the object to be synced.
+	err := c.reconcile(ctx, key.(string))
 	if err == nil {
 		// If no error occurs then we Forget this item so it does not
 		// get queued again until another change happens.
-		c.workqueue.Forget(objRef)
-		c.logger.Info("Successfully synced", "objectName", objRef)
+		c.workqueue.Forget(key)
+		c.logger.Info("Successfully synced", "objectName", key)
 		return true
 	}
 	// there was a failure so be sure to report it.  This method allows for
 	// pluggable error handling which can be used for things like
 	// cluster-monitoring.
-	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing; requeuing for later retry", "objectReference", objRef)
+	utilruntime.HandleErrorWithContext(ctx, err, "Error syncing; requeuing for later retry", "objectReference", key)
 	// since we failed, we should requeue the item to work on later.  This
 	// method will add a backoff to avoid hotlooping on particular items
 	// (they're probably still not going to work right away) and overall
 	// controller protection (everything I've done is broken, this controller
 	// needs to calm down or it can starve other useful work) cases.
-	c.workqueue.AddRateLimited(objRef)
+	c.workqueue.AddRateLimited(key)
 	return true
 }
 
-// syncHandler compares the actual state with the desired, and attempts to
+// reconcile compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the InFlightOperation resource
 // with the current status of the resource.
-func (c *Controller) syncHandler(ctx context.Context, objectRef cache.ObjectName) error {
+func (c *Controller) reconcile(ctx context.Context, key string) error {
 	//logger := klog.LoggerWithValues(klog.FromContext(ctx), "objectRef", objectRef)
 
-	// Get the InFlightOperation resource with this namespace/name
-	inflightOperation, err := c.inflightOperationsLister.InFlightOperations(objectRef.Namespace).Get(objectRef.Name)
-	if err != nil {
-		// The InFlightOperation resource may no longer exist, in which case we stop
-		// processing.
-		if errors.IsNotFound(err) {
-			utilruntime.HandleErrorWithContext(ctx, err, "InFlightOperation referenced by item in work queue no longer exists", "objectReference", objectRef)
-			return nil
+	/*
+		// Get the InFlightOperation resource with this namespace/name
+		inflightOperation, err := c.inflightOperationsLister.InFlightOperations(objectRef.Namespace).Get(objectRef.Name)
+		if err != nil {
+			// The InFlightOperation resource may no longer exist, in which case we stop
+			// processing.
+			if errors.IsNotFound(err) {
+				utilruntime.HandleErrorWithContext(ctx, err, "InFlightOperation referenced by item in work queue no longer exists", "objectReference", objectRef)
+				return nil
+			}
+
+			return err
 		}
 
-		return err
-	}
+		err = c.updateInFlightOperationStatus(ctx, inflightOperation)
+		if err != nil {
+			return err
+		}
 
-	err = c.updateInFlightOperationStatus(ctx, inflightOperation)
-	if err != nil {
-		return err
-	}
-
-	c.recorder.Event(inflightOperation, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+		c.recorder.Event(inflightOperation, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
+	*/
 	return nil
 }
 
@@ -339,9 +337,7 @@ func (c *Controller) updateInFlightOperationStatus(ctx context.Context, inflight
 	return nil
 }
 
-// enqueueInFlightOperation takes a InFlightOperation resource and converts it into a namespace/name
-// string which is then put onto the work queue. This method should *not* be
-// passed resources of any type other than InFlightOperation.
+/*
 func (c *Controller) enqueueInFlightOperation(obj interface{}) {
 	if objectRef, err := cache.ObjectToName(obj); err != nil {
 		utilruntime.HandleError(err)
@@ -395,3 +391,5 @@ func (c *Controller) handleObject(obj interface{}) {
 		return
 	}
 }
+
+*/
