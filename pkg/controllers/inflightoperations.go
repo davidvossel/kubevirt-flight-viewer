@@ -104,6 +104,56 @@ type Controller struct {
 	// recorder is an event recorder for recording Event resources to the
 	// Kubernetes API.
 	recorder record.EventRecorder
+
+	logger klog.Logger
+}
+
+func (c *Controller) genericAddHandler(obj interface{}, resourceType string) {
+	//o := obj.(metav1.Object)
+
+	// TODO - enqueue all operations tracking this resource type
+	c.logger.Info(fmt.Sprintf("Add event for resource type %s", resourceType))
+}
+
+func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType string) {
+	curObj := cur.(metav1.Object)
+	oldObj := old.(metav1.Object)
+	if curObj.GetResourceVersion() == oldObj.GetResourceVersion() {
+		// Periodic resync will send update events for all known objects.
+		// Two different versions of the same object will always have different RVs.
+		return
+	}
+
+	// TODO - enqueue all operations tracking this resource type
+	c.logger.Info(fmt.Sprintf("Update event for resource type %s", resourceType))
+
+}
+
+func validateDeleteObject(obj interface{}) (metav1.Object, error) {
+	var o metav1.Object
+	tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+	if ok {
+		o, ok = tombstone.Obj.(metav1.Object)
+		if !ok {
+			return nil, fmt.Errorf("tombstone contained object that is not a k8s object %#v", obj)
+		}
+	} else if o, ok = obj.(metav1.Object); !ok {
+		return nil, fmt.Errorf("couldn't get object from %+v", obj)
+	}
+	return o, nil
+}
+
+func (c *Controller) genericDeleteHandler(obj interface{}, resourceType string) {
+	/*
+		o, err := validateDeleteObject(obj)
+		if err != nil {
+			log.Log.Reason(err).Error("Failed to process delete notification")
+			return
+		}
+	*/
+
+	// TODO - enqueue all operations tracking this resource type
+	c.logger.Info(fmt.Sprintf("Delete event for resource type %s", resourceType))
 }
 
 // NewController returns a new flightviewer controller
@@ -112,7 +162,7 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	flightviewerclientset clientset.Interface,
 	inflightOperationInformer informers.InFlightOperationInformer,
-	resourceInformers map[string]cache.SharedIndexInformer) *Controller {
+	resourceInformers map[string]cache.SharedIndexInformer) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
 	// Create event broadcaster
@@ -137,6 +187,7 @@ func NewController(
 		inflightOperationsSynced: inflightOperationInformer.Informer().HasSynced,
 		workqueue:                workqueue.NewTypedRateLimitingQueue(ratelimiter),
 		recorder:                 recorder,
+		logger:                   logger,
 	}
 
 	logger.Info("Setting up event handlers")
@@ -147,23 +198,26 @@ func NewController(
 			controller.enqueueInFlightOperation(new)
 		},
 	})
-	/*
-		deploymentInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: controller.handleObject,
-			UpdateFunc: func(old, new interface{}) {
-				newDepl := new.(*appsv1.Deployment)
-				oldDepl := old.(*appsv1.Deployment)
-				if newDepl.ResourceVersion == oldDepl.ResourceVersion {
-					// Periodic resync will send update events for all known Deployments.
-					// Two different versions of the same Deployment will always have different RVs.
-					return
-				}
-				controller.handleObject(new)
+
+	for resourceType, informer := range resourceInformers {
+		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				controller.genericAddHandler(obj, resourceType)
 			},
-			DeleteFunc: controller.handleObject,
+			DeleteFunc: func(obj interface{}) {
+				controller.genericDeleteHandler(obj, resourceType)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				controller.genericUpdateHandler(oldObj, newObj, resourceType)
+			},
 		})
-	*/
-	return controller
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return controller, nil
 }
 
 // Run will set up the event handlers for types we are interested in, as well
@@ -175,11 +229,15 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 	defer c.workqueue.ShutDown()
 	logger := klog.FromContext(ctx)
 
+	c.logger = logger
+
 	// Start the informer factories to begin populating the informer caches
-	logger.Info("Starting InFlightOperation controller")
+	c.logger.Info("Starting InFlightOperation controller")
 
 	// Wait for the caches to be synced before starting workers
-	logger.Info("Waiting for informer caches to sync")
+	c.logger.Info("Waiting for informer caches to sync")
+
+	// TODO sync resource informers
 
 	if ok := cache.WaitForCacheSync(ctx.Done(), c.inflightOperationsSynced); !ok {
 		return fmt.Errorf("failed to wait for caches to sync")
@@ -191,9 +249,9 @@ func (c *Controller) Run(ctx context.Context, workers int) error {
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	logger.Info("Started workers")
+	c.logger.Info("Started workers")
 	<-ctx.Done()
-	logger.Info("Shutting down workers")
+	c.logger.Info("Shutting down workers")
 
 	return nil
 }
@@ -210,7 +268,6 @@ func (c *Controller) runWorker(ctx context.Context) {
 // attempt to process it, by calling the syncHandler.
 func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	objRef, shutdown := c.workqueue.Get()
-	logger := klog.FromContext(ctx)
 
 	if shutdown {
 		return false
@@ -230,7 +287,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// If no error occurs then we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(objRef)
-		logger.Info("Successfully synced", "objectName", objRef)
+		c.logger.Info("Successfully synced", "objectName", objRef)
 		return true
 	}
 	// there was a failure so be sure to report it.  This method allows for
