@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -82,6 +83,30 @@ func RegisterOperation(registration InFlightOperationRegistration, operationName
 	return nil
 }
 
+type queueKey struct {
+	Name         string `json:"name"`
+	Namespace    string `json:"namespace"`
+	ResourceType string `json:"resourceType"`
+}
+
+func queueKeyToString(qk *queueKey) (string, error) {
+	jsonData, err := json.Marshal(qk)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonData), nil
+}
+
+func queueStringToKey(qkString string) (*queueKey, error) {
+
+	var qk queueKey
+	err := json.Unmarshal([]byte(qkString), &qk)
+	if err != nil {
+		return nil, err
+	}
+	return &qk, nil
+}
+
 // Controller is the controller implementation for InFlightOperation resources
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
@@ -102,9 +127,18 @@ type Controller struct {
 }
 
 func (c *Controller) genericAddHandler(obj interface{}, resourceType string) {
-	//o := obj.(metav1.Object)
+	o := obj.(metav1.Object)
 
-	// TODO - enqueue all operations tracking this resource type
+	key, err := queueKeyToString(&queueKey{
+		Name:         o.GetName(),
+		Namespace:    o.GetNamespace(),
+		ResourceType: resourceType,
+	})
+	if err != nil {
+		c.logger.Error(err, fmt.Sprintf("failed to process add handler for resource type %s", resourceType))
+		return
+	}
+	c.workqueue.Add(key)
 	c.logger.Info(fmt.Sprintf("Add event for resource type %s", resourceType))
 }
 
@@ -112,12 +146,19 @@ func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType str
 	curObj := cur.(metav1.Object)
 	oldObj := old.(metav1.Object)
 	if curObj.GetResourceVersion() == oldObj.GetResourceVersion() {
-		// Periodic resync will send update events for all known objects.
-		// Two different versions of the same object will always have different RVs.
 		return
 	}
 
-	// TODO - enqueue all operations tracking this resource type
+	key, err := queueKeyToString(&queueKey{
+		Name:         curObj.GetName(),
+		Namespace:    curObj.GetNamespace(),
+		ResourceType: resourceType,
+	})
+	if err != nil {
+		c.logger.Error(err, fmt.Sprintf("failed to process update handler for resource type %s", resourceType))
+		return
+	}
+	c.workqueue.Add(key)
 	c.logger.Info(fmt.Sprintf("Update event for resource type %s", resourceType))
 
 }
@@ -137,15 +178,22 @@ func validateDeleteObject(obj interface{}) (metav1.Object, error) {
 }
 
 func (c *Controller) genericDeleteHandler(obj interface{}, resourceType string) {
-	/*
-		o, err := validateDeleteObject(obj)
-		if err != nil {
-			log.Log.Reason(err).Error("Failed to process delete notification")
-			return
-		}
-	*/
+	o, err := validateDeleteObject(obj)
+	if err != nil {
+		c.logger.Error(err, "Failed to process delete notification")
+		return
+	}
 
-	// TODO - enqueue all operations tracking this resource type
+	key, err := queueKeyToString(&queueKey{
+		Name:         o.GetName(),
+		Namespace:    o.GetNamespace(),
+		ResourceType: resourceType,
+	})
+	if err != nil {
+		c.logger.Error(err, fmt.Sprintf("failed to process delete handler for resource type %s", resourceType))
+		return
+	}
+	c.workqueue.Add(key)
 	c.logger.Info(fmt.Sprintf("Delete event for resource type %s", resourceType))
 }
 
@@ -304,6 +352,8 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // with the current status of the resource.
 func (c *Controller) reconcile(ctx context.Context, key string) error {
 	//logger := klog.LoggerWithValues(klog.FromContext(ctx), "objectRef", objectRef)
+
+	c.logger.Info(fmt.Sprintf("processing key: %s", key))
 
 	/*
 		// Get the InFlightOperation resource with this namespace/name
