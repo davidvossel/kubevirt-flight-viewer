@@ -66,6 +66,7 @@ type InFlightOperationRegistration interface {
 	ProcessOperation(context.Context, interface{}, []*flightviewerv1alpha1.InFlightOperation)
 }
 
+// TODO sync map or somehow prevent writes after init.
 var registrations map[string]registrationObj
 
 type registrationObj struct {
@@ -75,6 +76,11 @@ type registrationObj struct {
 }
 
 func RegisterOperation(registration InFlightOperationRegistration, operationName string, resourceType string) error {
+
+	if registrations == nil {
+		registrations = map[string]registrationObj{}
+	}
+
 	registrations[operationName] = registrationObj{
 		operationName: operationName,
 		resourceType:  resourceType,
@@ -105,6 +111,16 @@ func queueStringToKey(qkString string) (*queueKey, error) {
 		return nil, err
 	}
 	return &qk, nil
+}
+
+func (c *Controller) getInformer(resourceType string) (cache.SharedIndexInformer, error) {
+
+	informer, ok := c.resourceInformers[resourceType]
+	if !ok {
+		return nil, fmt.Errorf("unknown shared index informer for resource type [%s]", resourceType)
+	}
+
+	return informer, nil
 }
 
 // Controller is the controller implementation for InFlightOperation resources
@@ -230,6 +246,7 @@ func NewController(
 		workqueue:                workqueue.NewNamedRateLimitingQueue(ratelimiter, "kubevirt-inflight-operation"),
 		recorder:                 recorder,
 		logger:                   logger,
+		resourceInformers:        resourceInformers,
 	}
 
 	logger.Info("Setting up event handlers")
@@ -350,10 +367,40 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 // reconcile compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the InFlightOperation resource
 // with the current status of the resource.
-func (c *Controller) reconcile(ctx context.Context, key string) error {
+func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 	//logger := klog.LoggerWithValues(klog.FromContext(ctx), "objectRef", objectRef)
 
-	c.logger.Info(fmt.Sprintf("processing key: %s", key))
+	c.logger.Info(fmt.Sprintf("processing queue key: %s", keyJSONStr))
+
+	key, err := queueStringToKey(keyJSONStr)
+	if err != nil {
+		return err
+	}
+
+	resourceInformer, err := c.getInformer(key.ResourceType)
+	if err != nil {
+		return err
+	}
+
+	objKey := key.Namespace + "/" + key.Name
+	if key.Namespace == "" {
+		objKey = key.Name
+	}
+
+	obj, exists, _ := resourceInformer.GetStore().GetByKey(objKey)
+	if !exists {
+		c.logger.Info(fmt.Sprintf("no obect found for [%s] of type [%s]", objKey, key.ResourceType))
+		return nil
+	}
+
+	c.logger.Info(fmt.Sprintf("registration count [%d]", len(registrations)))
+
+	for _, regObj := range registrations {
+		if regObj.resourceType == key.ResourceType {
+			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationName, key.ResourceType))
+			regObj.registration.ProcessOperation(ctx, obj, nil)
+		}
+	}
 
 	/*
 		// Get the InFlightOperation resource with this namespace/name
