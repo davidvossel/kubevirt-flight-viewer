@@ -24,6 +24,14 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // InFlightOperation is a specification for a InFlightOperation resource
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=inflightoperations,shortName=ifo;icoss,scope=Namespaced
+// +kubebuilder:storageversion
+// +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Operation_Type",type="string",JSONPath=".status.operationType",description="Operation Type"
+// +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
+// +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
 type InFlightOperation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

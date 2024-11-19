@@ -11,10 +11,26 @@ spec:
     kind: InFlightOperation
     listKind: InFlightOperationList
     plural: inflightoperations
+    shortNames:
+    - ifo
+    - icoss
     singular: inflightoperation
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: Operation Type
+      jsonPath: .status.operationType
+      name: Operation_Type
+      type: string
+    - description: Resource Kind
+      jsonPath: .metadata.ownerReferences[0].kind
+      name: Resource_Kind
+      type: string
+    - description: Resource Name
+      jsonPath: .metadata.ownerReferences[0].name
+      name: Resource_Name
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: InFlightOperation is a specification for a InFlightOperation
@@ -57,3 +73,5 @@ spec:
         type: object
     served: true
     storage: true
+    subresources:
+      status: {}
