@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -39,7 +40,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 
-	flightviewerv1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
+	v1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
 	flightviewerscheme "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned/scheme"
 	informers "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions/kubevirtflightviewer/v1alpha1"
@@ -66,7 +67,7 @@ const (
 )
 
 type InFlightOperationRegistration interface {
-	ProcessOperation(context.Context, interface{}, []flightviewerv1alpha1.InFlightOperation) []flightviewerv1alpha1.InFlightOperation
+	ProcessOperation(context.Context, interface{}, *v1alpha1.InFlightOperationSpec) *v1alpha1.InFlightOperationSpec
 }
 
 // TODO sync map or somehow prevent writes after init.
@@ -130,8 +131,8 @@ func (c *Controller) getInformer(resourceType string) (cache.SharedIndexInformer
 type Controller struct {
 	// kubeclientset is a standard kubernetes clientset
 	kubeclientset kubernetes.Interface
-	// flightviewerclientset is a clientset for our own API group
-	flightviewerclientset clientset.Interface
+	// fvclientset is a clientset for our own API group
+	fvclientset clientset.Interface
 
 	inflightOperationsLister listers.InFlightOperationLister
 	inflightOperationsSynced cache.InformerSynced
@@ -182,14 +183,65 @@ func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType str
 
 }
 
-func (c *Controller) processOldAndNewOperations(newOps []flightviewerv1alpha1.InFlightOperation,
-	oldOps []flightviewerv1alpha1.InFlightOperation,
-	resourceRef *flightviewerv1alpha1.InFlightResourceReference) error {
+func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1alpha1.InFlightOperation,
+	oldOps []v1alpha1.InFlightOperation) error {
 
-	c.logger.Info(fmt.Sprintf("processing [%d] new and [%d] old operations", len(newOps), len(oldOps)))
+	var err error
+	var origOp *v1alpha1.InFlightOperation = nil
+	deleteOps := []v1alpha1.InFlightOperation{}
+
+	if curOp == nil || curOp.Name == "" {
+		deleteOps = oldOps
+	} else if curOp.Name != "" {
+		origOp = curOp.DeepCopy()
+		for _, op := range oldOps {
+			if op.Name != curOp.Name {
+				deleteOps = append(deleteOps, op)
+			}
+		}
+	}
+
+	// Create or Update
+	if curOp != nil && curOp.Name == "" {
+		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Create(ctx, curOp, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("error during creating operation: %v", err)
+		}
+	} else if !equality.Semantic.DeepEqual(origOp.Spec, curOp.Spec) {
+		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Update(ctx, curOp, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error during updating operation: %v", err)
+		}
+	}
+
+	// Update Status
+	if origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
+		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(origOp.Namespace).UpdateStatus(ctx, origOp, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error during updating operation status: %v", err)
+		}
+	}
+
+	for _, op := range deleteOps {
+		err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(op.Namespace).Delete(ctx, op.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("error during deleting operation: %v", err)
+		}
+	}
 
 	return nil
 
+}
+
+func currentOperation(ops []v1alpha1.InFlightOperation) *v1alpha1.InFlightOperation {
+
+	var cur *v1alpha1.InFlightOperation = nil
+	for _, op := range ops {
+		if cur == nil || cur.CreationTimestamp.Before(&op.CreationTimestamp) {
+			cur = op.DeepCopy()
+		}
+	}
+	return cur
 }
 
 func validateDeleteObject(obj interface{}) (metav1.Object, error) {
@@ -230,7 +282,7 @@ func (c *Controller) genericDeleteHandler(obj interface{}, resourceType string) 
 func NewController(
 	ctx context.Context,
 	kubeclientset kubernetes.Interface,
-	flightviewerclientset clientset.Interface,
+	fvclientset clientset.Interface,
 	inflightOperationInformer informers.InFlightOperationInformer,
 	resourceInformers map[string]cache.SharedIndexInformer) (*Controller, error) {
 	logger := klog.FromContext(ctx)
@@ -253,7 +305,7 @@ func NewController(
 
 	controller := &Controller{
 		kubeclientset:            kubeclientset,
-		flightviewerclientset:    flightviewerclientset,
+		fvclientset:              fvclientset,
 		inflightOperationsLister: inflightOperationInformer.Lister(),
 		inflightOperationsSynced: inflightOperationInformer.Informer().HasSynced,
 		workqueue:                workqueue.NewNamedRateLimitingQueue(ratelimiter, "kubevirt-inflight-operation"),
@@ -377,14 +429,14 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) getOperationsForResource(resourceRef *flightviewerv1alpha1.InFlightResourceReference, operationType string) ([]flightviewerv1alpha1.InFlightOperation, error) {
+func (c *Controller) getOperationsForResource(resourceRef *v1alpha1.InFlightResourceReference, operationType string) ([]v1alpha1.InFlightOperation, error) {
 	// TODO make custom indexer for this
 	allInFlightOperations, err := c.inflightOperationsLister.InFlightOperations(resourceRef.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	relatedInFlightOperations := []flightviewerv1alpha1.InFlightOperation{}
+	relatedInFlightOperations := []v1alpha1.InFlightOperation{}
 
 	for _, op := range allInFlightOperations {
 		if op.Status.OperationType != operationType {
@@ -434,7 +486,7 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 			objType := obj.(runtime.Object)
 			objMeta := obj.(metav1.Object)
 
-			resourceRef := flightviewerv1alpha1.InFlightResourceReference{
+			resourceRef := v1alpha1.InFlightResourceReference{
 				APIVersion: objType.GetObjectKind().GroupVersionKind().Group + "/" + objType.GetObjectKind().GroupVersionKind().Version,
 				Kind:       objType.GetObjectKind().GroupVersionKind().Kind,
 				Name:       objMeta.GetName(),
@@ -445,33 +497,40 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 			if err != nil {
 				return err
 			}
-			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, key.ResourceType))
-			newOperations := regObj.registration.ProcessOperation(ctx, obj, oldOperations)
 
-			c.processOldAndNewOperations(newOperations, oldOperations, &resourceRef)
+			curOp := currentOperation(oldOperations)
+			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, key.ResourceType))
+
+			var curSpec *v1alpha1.InFlightOperationSpec
+
+			if curOp == nil {
+				curSpec = &v1alpha1.InFlightOperationSpec{}
+			} else {
+				curSpec = curOp.Spec.DeepCopy()
+			}
+
+			curSpec = regObj.registration.ProcessOperation(ctx, obj, curSpec)
+
+			if curSpec == nil {
+				curOp = nil
+			} else if curOp == nil {
+				curOp = &v1alpha1.InFlightOperation{}
+				curOp.GenerateName = strings.ToLower(regObj.operationType)
+				curOp.Namespace = resourceRef.Namespace
+			}
+
+			if curOp != nil {
+				curOp.Spec = *curSpec
+				curOp.Status.ResourceReference = &resourceRef
+				curOp.Status.OperationType = regObj.operationType
+			}
+
+			err = c.processOldAndNewOperations(ctx, curOp, oldOperations)
+			if err != nil {
+				return fmt.Errorf("failed to process operation: %v", err)
+			}
 		}
 	}
 
-	/*
-		// Get the InFlightOperation resource with this namespace/name
-		inflightOperation, err := c.inflightOperationsLister.InFlightOperations(objectRef.Namespace).Get(objectRef.Name)
-		if err != nil {
-			// The InFlightOperation resource may no longer exist, in which case we stop
-			// processing.
-			if errors.IsNotFound(err) {
-				utilruntime.HandleErrorWithContext(ctx, err, "InFlightOperation referenced by item in work queue no longer exists", "objectReference", objectRef)
-				return nil
-			}
-
-			return err
-		}
-
-		err = c.updateInFlightOperationStatus(ctx, inflightOperation)
-		if err != nil {
-			return err
-		}
-
-		c.recorder.Event(inflightOperation, corev1.EventTypeNormal, SuccessSynced, MessageResourceSynced)
-	*/
 	return nil
 }

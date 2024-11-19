@@ -56,8 +56,10 @@ type InFlightResourceReference struct {
 
 // InFlightOperationStatus is the status for a InFlightOperation resource
 type InFlightOperationStatus struct {
+	// OperationType of operation
 	OperationType string `json:"operationType"`
 
+	// ResourceReference of operation
 	ResourceReference *InFlightResourceReference `json:"resourceReference"`
 }
 

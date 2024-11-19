@@ -19,20 +19,16 @@ func RegisterOperation() {
 type migrationOperation struct {
 }
 
-func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface{}, curOps []flightviewerv1alpha1.InFlightOperation) []flightviewerv1alpha1.InFlightOperation {
+func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface{}, op *flightviewerv1alpha1.InFlightOperationSpec) *flightviewerv1alpha1.InFlightOperationSpec {
 
 	logger := klog.FromContext(ctx)
 
 	vmi := obj.(*virtv1.VirtualMachineInstance)
 	logger.Info(fmt.Sprintf("processing live migration operation for vmi [%s]", vmi.Name))
 
-	var cur flightviewerv1alpha1.InFlightOperation
-
-	if len(curOps) == 0 {
-		cur = flightviewerv1alpha1.InFlightOperation{}
-	} else {
-		cur = curOps[0]
+	if op != nil {
+		op = &flightviewerv1alpha1.InFlightOperationSpec{}
 	}
 
-	return []flightviewerv1alpha1.InFlightOperation{cur}
+	return op
 }
