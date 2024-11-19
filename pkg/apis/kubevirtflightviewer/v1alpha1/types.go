@@ -58,9 +58,6 @@ type InFlightResourceReference struct {
 type InFlightOperationStatus struct {
 	// OperationType of operation
 	OperationType string `json:"operationType"`
-
-	// ResourceReference of operation
-	ResourceReference *InFlightResourceReference `json:"resourceReference"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	v1alpha1 "k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
@@ -429,9 +430,9 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) getOperationsForResource(resourceRef *v1alpha1.InFlightResourceReference, operationType string) ([]v1alpha1.InFlightOperation, error) {
+func (c *Controller) getOperationsForResource(ownerRef *metav1.OwnerReference, namespace string, operationType string) ([]v1alpha1.InFlightOperation, error) {
 	// TODO make custom indexer for this
-	allInFlightOperations, err := c.inflightOperationsLister.InFlightOperations(resourceRef.Namespace).List(labels.Everything())
+	allInFlightOperations, err := c.inflightOperationsLister.InFlightOperations(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -441,7 +442,7 @@ func (c *Controller) getOperationsForResource(resourceRef *v1alpha1.InFlightReso
 	for _, op := range allInFlightOperations {
 		if op.Status.OperationType != operationType {
 			continue
-		} else if !equality.Semantic.DeepEqual(op.Status.ResourceReference, resourceRef) {
+		} else if !equality.Semantic.DeepEqual(&op.OwnerReferences[0], ownerRef) {
 			continue
 		}
 		relatedInFlightOperations = append(relatedInFlightOperations, *op.DeepCopy())
@@ -486,14 +487,10 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 			objType := obj.(runtime.Object)
 			objMeta := obj.(metav1.Object)
 
-			resourceRef := v1alpha1.InFlightResourceReference{
-				APIVersion: objType.GetObjectKind().GroupVersionKind().Group + "/" + objType.GetObjectKind().GroupVersionKind().Version,
-				Kind:       objType.GetObjectKind().GroupVersionKind().Kind,
-				Name:       objMeta.GetName(),
-				Namespace:  objMeta.GetNamespace(),
-			}
+			ownerRef := metav1.NewControllerRef(objMeta, objType.GetObjectKind().GroupVersionKind())
+			ownerRef.BlockOwnerDeletion = ptr.To(false)
 
-			oldOperations, err := c.getOperationsForResource(&resourceRef, regObj.operationType)
+			oldOperations, err := c.getOperationsForResource(ownerRef, objMeta.GetNamespace(), regObj.operationType)
 			if err != nil {
 				return err
 			}
@@ -516,12 +513,12 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 			} else if curOp == nil {
 				curOp = &v1alpha1.InFlightOperation{}
 				curOp.GenerateName = strings.ToLower(regObj.operationType)
-				curOp.Namespace = resourceRef.Namespace
+				curOp.Namespace = objMeta.GetNamespace()
+				curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 			}
 
 			if curOp != nil {
 				curOp.Spec = *curSpec
-				curOp.Status.ResourceReference = &resourceRef
 				curOp.Status.OperationType = regObj.operationType
 			}
 
