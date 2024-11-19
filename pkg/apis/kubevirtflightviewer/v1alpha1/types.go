@@ -36,8 +36,29 @@ type InFlightOperation struct {
 type InFlightOperationSpec struct {
 }
 
+type InFlightResourceReference struct {
+	// API version of the referent.
+	// +optional
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
+	// Kind of the referent.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+	// +optional
+	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
+	// Namespace of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+	// +optional
+	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
+	// Name of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	// +optional
+	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
+}
+
 // InFlightOperationStatus is the status for a InFlightOperation resource
 type InFlightOperationStatus struct {
+	OperationType string `json:"operationType"`
+
+	ResourceReference *InFlightResourceReference `json:"resourceReference"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

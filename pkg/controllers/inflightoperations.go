@@ -25,7 +25,10 @@ import (
 	"golang.org/x/time/rate"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -63,26 +66,26 @@ const (
 )
 
 type InFlightOperationRegistration interface {
-	ProcessOperation(context.Context, interface{}, []*flightviewerv1alpha1.InFlightOperation)
+	ProcessOperation(context.Context, interface{}, []flightviewerv1alpha1.InFlightOperation) []flightviewerv1alpha1.InFlightOperation
 }
 
 // TODO sync map or somehow prevent writes after init.
 var registrations map[string]registrationObj
 
 type registrationObj struct {
-	operationName string
+	operationType string
 	resourceType  string
 	registration  InFlightOperationRegistration
 }
 
-func RegisterOperation(registration InFlightOperationRegistration, operationName string, resourceType string) error {
+func RegisterOperation(registration InFlightOperationRegistration, operationType string, resourceType string) error {
 
 	if registrations == nil {
 		registrations = map[string]registrationObj{}
 	}
 
-	registrations[operationName] = registrationObj{
-		operationName: operationName,
+	registrations[operationType] = registrationObj{
+		operationType: operationType,
 		resourceType:  resourceType,
 		registration:  registration,
 	}
@@ -176,6 +179,16 @@ func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType str
 	}
 	c.workqueue.Add(key)
 	c.logger.Info(fmt.Sprintf("Update event for resource type %s", resourceType))
+
+}
+
+func (c *Controller) processOldAndNewOperations(newOps []flightviewerv1alpha1.InFlightOperation,
+	oldOps []flightviewerv1alpha1.InFlightOperation,
+	resourceRef *flightviewerv1alpha1.InFlightResourceReference) error {
+
+	c.logger.Info(fmt.Sprintf("processing [%d] new and [%d] old operations", len(newOps), len(oldOps)))
+
+	return nil
 
 }
 
@@ -364,6 +377,27 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
+func (c *Controller) getOperationsForResource(resourceRef *flightviewerv1alpha1.InFlightResourceReference, operationType string) ([]flightviewerv1alpha1.InFlightOperation, error) {
+	// TODO make custom indexer for this
+	allInFlightOperations, err := c.inflightOperationsLister.InFlightOperations(resourceRef.Namespace).List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	relatedInFlightOperations := []flightviewerv1alpha1.InFlightOperation{}
+
+	for _, op := range allInFlightOperations {
+		if op.Status.OperationType != operationType {
+			continue
+		} else if !equality.Semantic.DeepEqual(op.Status.ResourceReference, resourceRef) {
+			continue
+		}
+		relatedInFlightOperations = append(relatedInFlightOperations, *op.DeepCopy())
+	}
+
+	return relatedInFlightOperations, nil
+}
+
 // reconcile compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the InFlightOperation resource
 // with the current status of the resource.
@@ -389,7 +423,7 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 
 	obj, exists, _ := resourceInformer.GetStore().GetByKey(objKey)
 	if !exists {
-		c.logger.Info(fmt.Sprintf("no obect found for [%s] of type [%s]", objKey, key.ResourceType))
+		c.logger.Info(fmt.Sprintf("no object found for [%s] of type [%s]", objKey, key.ResourceType))
 		return nil
 	}
 
@@ -397,8 +431,24 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 
 	for _, regObj := range registrations {
 		if regObj.resourceType == key.ResourceType {
-			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationName, key.ResourceType))
-			regObj.registration.ProcessOperation(ctx, obj, nil)
+			objType := obj.(runtime.Object)
+			objMeta := obj.(metav1.Object)
+
+			resourceRef := flightviewerv1alpha1.InFlightResourceReference{
+				APIVersion: objType.GetObjectKind().GroupVersionKind().Group + "/" + objType.GetObjectKind().GroupVersionKind().Version,
+				Kind:       objType.GetObjectKind().GroupVersionKind().Kind,
+				Name:       objMeta.GetName(),
+				Namespace:  objMeta.GetNamespace(),
+			}
+
+			oldOperations, err := c.getOperationsForResource(&resourceRef, regObj.operationType)
+			if err != nil {
+				return err
+			}
+			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, key.ResourceType))
+			newOperations := regObj.registration.ProcessOperation(ctx, obj, oldOperations)
+
+			c.processOldAndNewOperations(newOperations, oldOperations, &resourceRef)
 		}
 	}
 

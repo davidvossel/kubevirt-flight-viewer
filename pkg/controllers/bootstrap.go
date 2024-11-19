@@ -87,12 +87,10 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 
-	//kubeInformerFactory.Start(ctx.Done())
 	kvViewerInformerFactory.Start(ctx.Done())
 	for _, informer := range resourceInformers {
 		go informer.Run(ctx.Done())
 	}
-	kvViewerInformerFactory.Start(ctx.Done())
 
 	if err = controller.Run(ctx, 2); err != nil {
 		logger.Error(err, "Error running controller")
