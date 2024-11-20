@@ -68,7 +68,7 @@ const (
 )
 
 type InFlightOperationRegistration interface {
-	ProcessOperation(context.Context, interface{}, *v1alpha1.InFlightOperationSpec) *v1alpha1.InFlightOperationSpec
+	ProcessOperation(context.Context, interface{}, []metav1.Condition) []metav1.Condition
 }
 
 // TODO sync map or somehow prevent writes after init.
@@ -208,11 +208,14 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 		if err != nil {
 			return fmt.Errorf("error during creating operation: %v", err)
 		}
-	} else if !equality.Semantic.DeepEqual(origOp.Spec, curOp.Spec) {
-		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Update(ctx, curOp, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("error during updating operation: %v", err)
-		}
+		/*
+			// TODO remove spec section entirely if not needed
+				} else if !equality.Semantic.DeepEqual(origOp.Spec, curOp.Spec) {
+					curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Update(ctx, curOp, metav1.UpdateOptions{})
+					if err != nil {
+						return fmt.Errorf("error during updating operation: %v", err)
+					}
+		*/
 	}
 
 	// Update Status
@@ -235,14 +238,16 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 }
 
 func currentOperation(ops []v1alpha1.InFlightOperation) *v1alpha1.InFlightOperation {
-
-	var cur *v1alpha1.InFlightOperation = nil
-	for _, op := range ops {
-		if cur == nil || cur.CreationTimestamp.Before(&op.CreationTimestamp) {
-			cur = op.DeepCopy()
+	curIdx := -1
+	for i, op := range ops {
+		if curIdx == -1 || ops[curIdx].CreationTimestamp.Before(&op.CreationTimestamp) {
+			curIdx = i
 		}
 	}
-	return cur
+	if curIdx == -1 {
+		return nil
+	}
+	return ops[curIdx].DeepCopy()
 }
 
 func validateDeleteObject(obj interface{}) (metav1.Object, error) {
@@ -498,28 +503,30 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 			curOp := currentOperation(oldOperations)
 			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, key.ResourceType))
 
-			var curSpec *v1alpha1.InFlightOperationSpec
+			var curConditions []metav1.Condition
 
 			if curOp == nil {
-				curSpec = &v1alpha1.InFlightOperationSpec{}
+				curConditions = []metav1.Condition{}
 			} else {
-				curSpec = curOp.Spec.DeepCopy()
+				curConditions = curOp.Status.Conditions
 			}
 
-			curSpec = regObj.registration.ProcessOperation(ctx, obj, curSpec)
+			curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
 
-			if curSpec == nil {
+			if len(curConditions) == 0 {
+				// If no conditions are returned, that's the signal that the
+				// operation is complete
 				curOp = nil
 			} else if curOp == nil {
 				curOp = &v1alpha1.InFlightOperation{}
 				curOp.GenerateName = strings.ToLower(regObj.operationType)
 				curOp.Namespace = objMeta.GetNamespace()
 				curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
+				curOp.Status.OperationType = regObj.operationType
 			}
 
 			if curOp != nil {
-				curOp.Spec = *curSpec
-				curOp.Status.OperationType = regObj.operationType
+				curOp.Status.Conditions = curConditions
 			}
 
 			err = c.processOldAndNewOperations(ctx, curOp, oldOperations)

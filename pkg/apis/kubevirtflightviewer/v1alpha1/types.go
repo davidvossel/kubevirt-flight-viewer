@@ -28,21 +28,23 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=inflightoperations,shortName=ifo;icoss,scope=Namespaced
 // +kubebuilder:storageversion
-// +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Operation_Type",type="string",JSONPath=".status.operationType",description="Operation Type"
 // +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
 // +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
+// +kubebuilder:printcolumn:name="Progressing",type="string",JSONPath=".status.conditions[?(@.type==\"Progressing\")].status",description="Progressing"
 type InFlightOperation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   InFlightOperationSpec   `json:"spec"`
+	//	Spec   InFlightOperationSpec   `json:"spec"`
 	Status InFlightOperationStatus `json:"status"`
 }
 
+/*
 // InFlightOperationSpec is the spec for a InFlightOperation resource
 type InFlightOperationSpec struct {
 }
+*/
 
 type InFlightResourceReference struct {
 	// API version of the referent.
@@ -66,6 +68,13 @@ type InFlightResourceReference struct {
 type InFlightOperationStatus struct {
 	// OperationType of operation
 	OperationType string `json:"operationType"`
+	// Conditions represents the latest available observations of an inflight operation
+	// +optional
+	// +listType=map
+	// +listMapKey=type
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
