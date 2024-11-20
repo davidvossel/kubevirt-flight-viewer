@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -75,21 +75,23 @@ type InFlightOperationRegistration interface {
 var registrations map[string]registrationObj
 
 type registrationObj struct {
-	operationType string
-	resourceType  string
-	registration  InFlightOperationRegistration
+	operationType            string
+	resourceType             string
+	resourceGroupVersionKind schema.GroupVersionKind
+	registration             InFlightOperationRegistration
 }
 
-func RegisterOperation(registration InFlightOperationRegistration, operationType string, resourceType string) error {
+func RegisterOperation(registration InFlightOperationRegistration, operationType string, resourceType string, resourceGroupVersionKind schema.GroupVersionKind) error {
 
 	if registrations == nil {
 		registrations = map[string]registrationObj{}
 	}
 
 	registrations[operationType] = registrationObj{
-		operationType: operationType,
-		resourceType:  resourceType,
-		registration:  registration,
+		operationType:            operationType,
+		resourceType:             resourceType,
+		registration:             registration,
+		resourceGroupVersionKind: resourceGroupVersionKind,
 	}
 	return nil
 }
@@ -489,10 +491,9 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 
 	for _, regObj := range registrations {
 		if regObj.resourceType == key.ResourceType {
-			objType := obj.(runtime.Object)
 			objMeta := obj.(metav1.Object)
 
-			ownerRef := metav1.NewControllerRef(objMeta, objType.GetObjectKind().GroupVersionKind())
+			ownerRef := metav1.NewControllerRef(objMeta, regObj.resourceGroupVersionKind)
 			ownerRef.BlockOwnerDeletion = ptr.To(false)
 
 			oldOperations, err := c.getOperationsForResource(ownerRef, objMeta.GetNamespace(), regObj.operationType)

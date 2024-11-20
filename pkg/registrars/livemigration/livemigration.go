@@ -15,7 +15,7 @@ import (
 )
 
 func RegisterOperation() {
-	controllers.RegisterOperation(&migrationOperation{}, "LiveMigration", "virtualmachineinstances")
+	controllers.RegisterOperation(&migrationOperation{}, "LiveMigration", "virtualmachineinstances", virtv1.VirtualMachineInstanceGroupVersionKind)
 }
 
 type migrationOperation struct {
