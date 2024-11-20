@@ -1,4 +1,4 @@
-package vmi
+package livemigration
 
 import (
 	//	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
