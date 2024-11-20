@@ -1,4 +1,4 @@
-package livemigration
+package starting
 
 import (
 	//	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
@@ -15,7 +15,7 @@ import (
 )
 
 func RegisterOperation() {
-	controllers.RegisterOperation(&migrationOperation{}, "LiveMigration", "virtualmachineinstances", virtv1.VirtualMachineInstanceGroupVersionKind)
+	controllers.RegisterOperation(&migrationOperation{}, "Starting", "virtualmachineinstances", virtv1.VirtualMachineInstanceGroupVersionKind)
 }
 
 type migrationOperation struct {
@@ -26,11 +26,19 @@ func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface
 	logger := klog.FromContext(ctx)
 
 	vmi := obj.(*virtv1.VirtualMachineInstance)
-	logger.Info(fmt.Sprintf("processing live migration operation for vmi [%s]", vmi.Name))
+	logger.Info(fmt.Sprintf("processing starting operation for vmi [%s]", vmi.Name))
 
-	if vmi.Status.MigrationState == nil || vmi.Status.MigrationState.EndTimestamp != nil {
-		// return empty conditions when no migration is in progress
-		// This signals no in-flight migration is taking place
+	if vmi.DeletionTimestamp != nil {
+		// return empty conditions when no stopping is in progress
+		// This signals no in-flight stopping is taking place
+		return []metav1.Condition{}
+	} else if vmi.Status.Phase != virtv1.VmPhaseUnset &&
+		vmi.Status.Phase != virtv1.Pending &&
+		vmi.Status.Phase != virtv1.Scheduling &&
+		vmi.Status.Phase != virtv1.Scheduled {
+
+		// return empty conditions when no stopping is in progress
+		// This signals no in-flight stopping is taking place
 		return []metav1.Condition{}
 	}
 
@@ -40,8 +48,8 @@ func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface
 			Type:               "Progressing",
 			ObservedGeneration: vmi.Generation,
 			Status:             metav1.ConditionTrue,
-			Reason:             "LiveMigrationProgressing",
-			Message:            fmt.Sprintf("Live migration is progressing to target node [%s] with target pod [%s]", vmi.Status.MigrationState.TargetNode, vmi.Status.MigrationState.TargetPod),
+			Reason:             "Starting",
+			Message:            fmt.Sprintf("Starting vm ", vmi.Name),
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		}
 	}

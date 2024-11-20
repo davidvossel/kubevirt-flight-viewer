@@ -22,6 +22,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/livemigration"
+	"k8s.io/kubevirt-flight-viewer/pkg/registrars/starting"
+	"k8s.io/kubevirt-flight-viewer/pkg/registrars/stopping"
 	"k8s.io/kubevirt-flight-viewer/pkg/signals"
 
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
@@ -52,6 +54,8 @@ func main() {
 func init() {
 	// register operations
 	livemigration.RegisterOperation()
+	stopping.RegisterOperation()
+	starting.RegisterOperation()
 
 	// register flags
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
