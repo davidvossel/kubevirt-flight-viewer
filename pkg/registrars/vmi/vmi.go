@@ -28,6 +28,12 @@ func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface
 	vmi := obj.(*virtv1.VirtualMachineInstance)
 	logger.Info(fmt.Sprintf("processing live migration operation for vmi [%s]", vmi.Name))
 
+	if vmi.Status.MigrationState == nil || vmi.Status.MigrationState.EndTimestamp != nil {
+		// return empty conditions when no migration is in progress
+		// This signals no in-flight migration is taking place
+		return []metav1.Condition{}
+	}
+
 	condition := meta.FindStatusCondition(conditions, "Progressing")
 	if condition == nil {
 		condition = &metav1.Condition{
@@ -35,7 +41,7 @@ func (m *migrationOperation) ProcessOperation(ctx context.Context, obj interface
 			ObservedGeneration: vmi.Generation,
 			Status:             metav1.ConditionTrue,
 			Reason:             "LiveMigrationProgressing",
-			Message:            "Live migration is progressing",
+			Message:            fmt.Sprintf("Live migration is progressing to target node [%s] with target pod [%s]", vmi.Status.MigrationState.TargetNode, vmi.Status.MigrationState.TargetPod),
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		}
 
