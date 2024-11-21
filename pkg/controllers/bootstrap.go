@@ -14,10 +14,12 @@ import (
 	"k8s.io/klog/v2"
 	informers "k8s.io/kubevirt-flight-viewer/pkg/generated/informers/externalversions"
 	kubev1 "kubevirt.io/api/core/v1"
+	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
+	cdiclient "kubevirt.io/containerized-data-importer/pkg/client/clientset/versioned"
 )
 
 const defaultResync = time.Second * 30
@@ -25,8 +27,18 @@ const defaultResync = time.Second * 30
 func init() {
 }
 
-func kvRestClient(cfg *restclient.Config) (*restclient.RESTClient, error) {
+func cdiRestClient(cfg *restclient.Config) (restclient.Interface, error) {
+	shallowCopy := *cfg
 
+	cdiClient, err := cdiclient.NewForConfig(&shallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	return cdiClient.CdiV1beta1().RESTClient(), nil
+}
+
+func kvRestClient(cfg *restclient.Config) (*restclient.RESTClient, error) {
 	schemeBuilder := runtime.NewSchemeBuilder(kubev1.AddKnownTypesGenerator(kubev1.GroupVersions))
 	scheme := runtime.NewScheme()
 	addToScheme := schemeBuilder.AddToScheme
@@ -64,16 +76,21 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 
 	resourceInformers := map[string]cache.SharedIndexInformer{}
 
-	// VMI informer
-
-	restClient, err := kvRestClient(cfg)
+	// KubeVirt informers
+	kvRC, err := kvRestClient(cfg)
 	if err != nil {
-		logger.Error(err, "Error building kubernetes rest client")
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
-
-	lw := cache.NewListWatchFromClient(restClient, "virtualmachineinstances", k8sv1.NamespaceAll, fields.Everything())
+	lw := cache.NewListWatchFromClient(kvRC, "virtualmachineinstances", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["virtualmachineinstances"] = cache.NewSharedIndexInformer(lw, &kubev1.VirtualMachineInstance{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	// CDI Informers
+	cdiRC, err := cdiRestClient(cfg)
+	if err != nil {
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+	lw = cache.NewListWatchFromClient(cdiRC, "datavolumes", k8sv1.NamespaceAll, fields.Everything())
+	resourceInformers["datavolumes"] = cache.NewSharedIndexInformer(lw, &cdiv1.DataVolume{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
 	//kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
 	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
