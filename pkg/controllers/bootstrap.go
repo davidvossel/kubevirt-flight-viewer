@@ -16,6 +16,8 @@ import (
 	kubev1 "kubevirt.io/api/core/v1"
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
+	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
+	ocpclient "github.com/openshift/client-go/machine/clientset/versioned"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
@@ -36,6 +38,17 @@ func cdiRestClient(cfg *restclient.Config) (restclient.Interface, error) {
 	}
 
 	return cdiClient.CdiV1beta1().RESTClient(), nil
+}
+
+func ocpMachineRestClient(cfg *restclient.Config) (restclient.Interface, error) {
+	shallowCopy := *cfg
+
+	ocpClient, err := ocpclient.NewForConfig(&shallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	return ocpClient.MachineV1().RESTClient(), nil
 }
 
 func kvRestClient(cfg *restclient.Config) (*restclient.RESTClient, error) {
@@ -89,10 +102,23 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 	if err != nil {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
+	// DataVolume Informer
 	lw = cache.NewListWatchFromClient(cdiRC, "datavolumes", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["datavolumes"] = cache.NewSharedIndexInformer(lw, &cdiv1.DataVolume{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
-	//kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Second*30)
+	// OCP Machine Informers
+	machineRC, err := ocpMachineRestClient(cfg)
+	if err != nil {
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
+	// Machine Informer
+	lw = cache.NewListWatchFromClient(machineRC, "machines", k8sv1.NamespaceAll, fields.Everything())
+	resourceInformers["machines"] = cache.NewSharedIndexInformer(lw, &machinev1beta1.Machine{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
+	// MachineSet Informer
+	lw = cache.NewListWatchFromClient(machineRC, "machinesets", k8sv1.NamespaceAll, fields.Everything())
+	resourceInformers["machinesets"] = cache.NewSharedIndexInformer(lw, &machinev1beta1.MachineSet{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
 	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
 
 	controller, err := NewController(ctx, kubeClient, kvViewerClient,

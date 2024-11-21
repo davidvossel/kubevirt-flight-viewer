@@ -5,6 +5,8 @@ module k8s.io/kubevirt-flight-viewer
 go 1.23.2
 
 require (
+	github.com/openshift/api v0.0.0-20240625084701-0689f006bcde
+	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 	golang.org/x/time v0.7.0
 	k8s.io/api v0.31.0
 	k8s.io/apimachinery v0.31.0
@@ -14,6 +16,7 @@ require (
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 	kubevirt.io/api v1.4.0
 	kubevirt.io/containerized-data-importer v1.60.3
+	kubevirt.io/containerized-data-importer-api v1.60.3
 )
 
 require (
@@ -55,7 +58,6 @@ require (
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9 // indirect
 	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
-	kubevirt.io/containerized-data-importer-api v1.60.3 // indirect
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.0.0-20220329064328-f3cc58c6ed90 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.2 // indirect
