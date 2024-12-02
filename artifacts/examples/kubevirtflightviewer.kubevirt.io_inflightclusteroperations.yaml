@@ -4,18 +4,18 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.5
-  name: inflightoperations.kubevirtflightviewer.kubevirt.io
+  name: inflightclusteroperations.kubevirtflightviewer.kubevirt.io
 spec:
   group: kubevirtflightviewer.kubevirt.io
   names:
-    kind: InFlightOperation
-    listKind: InFlightOperationList
-    plural: inflightoperations
+    kind: InFlightClusterOperation
+    listKind: InFlightClusterOperationList
+    plural: inflightclusteroperations
     shortNames:
-    - ifo
-    - ifos
-    singular: inflightoperation
-  scope: Namespaced
+    - ifco
+    - ifcos
+    singular: inflightclusteroperation
+  scope: Cluster
   versions:
   - additionalPrinterColumns:
     - description: Operation Type
@@ -41,7 +41,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: InFlightOperation is a specification for a InFlightOperation
+        description: InFlightClusterOperation is a specification for a InFlightClusterOperation
           resource
         properties:
           apiVersion:

@@ -24,6 +24,8 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
+	// InFlightClusterOperations returns a InFlightClusterOperationInformer.
+	InFlightClusterOperations() InFlightClusterOperationInformer
 	// InFlightOperations returns a InFlightOperationInformer.
 	InFlightOperations() InFlightOperationInformer
 }
@@ -37,6 +39,11 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
+}
+
+// InFlightClusterOperations returns a InFlightClusterOperationInformer.
+func (v *version) InFlightClusterOperations() InFlightClusterOperationInformer {
+	return &inFlightClusterOperationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // InFlightOperations returns a InFlightOperationInformer.

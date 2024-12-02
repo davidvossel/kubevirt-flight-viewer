@@ -28,12 +28,17 @@ import (
 
 type KubevirtflightviewerV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	InFlightClusterOperationsGetter
 	InFlightOperationsGetter
 }
 
 // KubevirtflightviewerV1alpha1Client is used to interact with features provided by the kubevirtflightviewer.kubevirt.io group.
 type KubevirtflightviewerV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *KubevirtflightviewerV1alpha1Client) InFlightClusterOperations(namespace string) InFlightClusterOperationInterface {
+	return newInFlightClusterOperations(c, namespace)
 }
 
 func (c *KubevirtflightviewerV1alpha1Client) InFlightOperations(namespace string) InFlightOperationInterface {

@@ -94,6 +94,9 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 	lw := cache.NewListWatchFromClient(kvRC, "virtualmachineinstances", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["virtualmachineinstances"] = cache.NewSharedIndexInformer(lw, &kubev1.VirtualMachineInstance{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
+	lw = cache.NewListWatchFromClient(kvRC, "kubevirts", k8sv1.NamespaceAll, fields.Everything())
+	resourceInformers["kubevirts"] = cache.NewSharedIndexInformer(lw, &kubev1.KubeVirt{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+
 	// CDI Informers
 	cdiRC, err := cdiRestClient(cfg)
 	if err != nil {

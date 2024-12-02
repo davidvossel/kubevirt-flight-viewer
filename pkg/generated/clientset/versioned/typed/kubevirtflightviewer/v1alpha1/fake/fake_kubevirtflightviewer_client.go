@@ -28,6 +28,10 @@ type FakeKubevirtflightviewerV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeKubevirtflightviewerV1alpha1) InFlightClusterOperations(namespace string) v1alpha1.InFlightClusterOperationInterface {
+	return newFakeInFlightClusterOperations(c, namespace)
+}
+
 func (c *FakeKubevirtflightviewerV1alpha1) InFlightOperations(namespace string) v1alpha1.InFlightOperationInterface {
 	return newFakeInFlightOperations(c, namespace)
 }

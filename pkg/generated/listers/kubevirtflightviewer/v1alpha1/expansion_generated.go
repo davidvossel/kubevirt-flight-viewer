@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// InFlightClusterOperationListerExpansion allows custom methods to be added to
+// InFlightClusterOperationLister.
+type InFlightClusterOperationListerExpansion interface{}
+
+// InFlightClusterOperationNamespaceListerExpansion allows custom methods to be added to
+// InFlightClusterOperationNamespaceLister.
+type InFlightClusterOperationNamespaceListerExpansion interface{}
+
 // InFlightOperationListerExpansion allows custom methods to be added to
 // InFlightOperationLister.
 type InFlightOperationListerExpansion interface{}

@@ -53,6 +53,8 @@ func (f *genericInformer) Lister() cache.GenericLister {
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
 	// Group=kubevirtflightviewer.kubevirt.io, Version=v1alpha1
+	case v1alpha1.SchemeGroupVersion.WithResource("inflightclusteroperations"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubevirtflightviewer().V1alpha1().InFlightClusterOperations().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("inflightoperations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Kubevirtflightviewer().V1alpha1().InFlightOperations().Informer()}, nil
 

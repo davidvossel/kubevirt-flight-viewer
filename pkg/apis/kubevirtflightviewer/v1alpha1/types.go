@@ -23,10 +23,41 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// InFlightClusterOperation is a specification for a InFlightClusterOperation resource
+//
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=inflightclusteroperations,shortName=ifco;ifcos,scope=Cluster
+// +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="Operation_Type",type="string",JSONPath=".status.operationType",description="Operation Type"
+// +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
+// +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
+// +kubebuilder:printcolumn:name="Progressing",type="string",JSONPath=".status.conditions[?(@.type==\"Progressing\")].status",description="Progressing"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
+type InFlightClusterOperation struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	//	Spec   InFlightOperationSpec   `json:"spec"`
+	Status InFlightOperationStatus `json:"status"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// InFlightClusterOperationList is a list of InFlightClusterOperation resources
+type InFlightClusterOperationList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []InFlightClusterOperation `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // InFlightOperation is a specification for a InFlightOperation resource
 //
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=inflightoperations,shortName=ifo;icoss,scope=Namespaced
+// +kubebuilder:resource:path=inflightoperations,shortName=ifo;ifos,scope=Namespaced
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Operation_Type",type="string",JSONPath=".status.operationType",description="Operation Type"
 // +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
@@ -39,30 +70,6 @@ type InFlightOperation struct {
 
 	//	Spec   InFlightOperationSpec   `json:"spec"`
 	Status InFlightOperationStatus `json:"status"`
-}
-
-/*
-// InFlightOperationSpec is the spec for a InFlightOperation resource
-type InFlightOperationSpec struct {
-}
-*/
-
-type InFlightResourceReference struct {
-	// API version of the referent.
-	// +optional
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,5,opt,name=apiVersion"`
-	// Kind of the referent.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	// +optional
-	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
-	// Namespace of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
-	// +optional
-	Namespace string `json:"namespace,omitempty" protobuf:"bytes,2,opt,name=namespace"`
-	// Name of the referent.
-	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-	// +optional
-	Name string `json:"name,omitempty" protobuf:"bytes,3,opt,name=name"`
 }
 
 // InFlightOperationStatus is the status for a InFlightOperation resource
