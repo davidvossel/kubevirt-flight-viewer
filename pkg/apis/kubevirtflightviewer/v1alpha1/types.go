@@ -31,7 +31,6 @@ import (
 // +kubebuilder:printcolumn:name="Operation_Type",type="string",JSONPath=".status.operationType",description="Operation Type"
 // +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
 // +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
-// +kubebuilder:printcolumn:name="Progressing",type="string",JSONPath=".status.conditions[?(@.type==\"Progressing\")].status",description="Progressing"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
 type InFlightClusterOperation struct {
 	metav1.TypeMeta   `json:",inline"`
