@@ -210,14 +210,6 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 		if err != nil {
 			return fmt.Errorf("error during creating operation: %v", err)
 		}
-		/*
-			// TODO remove spec section entirely if not needed
-				} else if !equality.Semantic.DeepEqual(origOp.Spec, curOp.Spec) {
-					curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Update(ctx, curOp, metav1.UpdateOptions{})
-					if err != nil {
-						return fmt.Errorf("error during updating operation: %v", err)
-					}
-		*/
 	}
 
 	// Update Status
@@ -458,6 +450,53 @@ func (c *Controller) getOperationsForResource(ownerRef *metav1.OwnerReference, n
 	return relatedInFlightOperations, nil
 }
 
+func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interface{}, regObj registrationObj, resourceType string) error {
+	objMeta := obj.(metav1.Object)
+
+	ownerRef := metav1.NewControllerRef(objMeta, regObj.resourceGroupVersionKind)
+	ownerRef.BlockOwnerDeletion = ptr.To(false)
+
+	oldOperations, err := c.getOperationsForResource(ownerRef, objMeta.GetNamespace(), regObj.operationType)
+	if err != nil {
+		return err
+	}
+
+	curOp := currentOperation(oldOperations)
+	//c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, resourceType))
+
+	var curConditions []metav1.Condition
+
+	if curOp == nil {
+		curConditions = []metav1.Condition{}
+	} else {
+		curConditions = curOp.Status.Conditions
+	}
+
+	curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
+
+	if len(curConditions) == 0 {
+		// If no conditions are returned, that's the signal that the
+		// operation is complete
+		curOp = nil
+	} else if curOp == nil {
+		curOp = &v1alpha1.InFlightOperation{}
+		curOp.GenerateName = strings.ToLower(regObj.operationType)
+		curOp.Namespace = objMeta.GetNamespace()
+		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
+		curOp.Status.OperationType = regObj.operationType
+	}
+
+	if curOp != nil {
+		curOp.Status.Conditions = curConditions
+	}
+
+	err = c.processOldAndNewOperations(ctx, curOp, oldOperations)
+	if err != nil {
+		return fmt.Errorf("failed to process operation: %v", err)
+	}
+	return nil
+}
+
 // reconcile compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the InFlightOperation resource
 // with the current status of the resource.
@@ -487,52 +526,17 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 		return nil
 	}
 
-	c.logger.Info(fmt.Sprintf("registration count [%d]", len(registrations)))
-
 	for _, regObj := range registrations {
 		if regObj.resourceType == key.ResourceType {
-			objMeta := obj.(metav1.Object)
-
-			ownerRef := metav1.NewControllerRef(objMeta, regObj.resourceGroupVersionKind)
-			ownerRef.BlockOwnerDeletion = ptr.To(false)
-
-			oldOperations, err := c.getOperationsForResource(ownerRef, objMeta.GetNamespace(), regObj.operationType)
-			if err != nil {
-				return err
-			}
-
-			curOp := currentOperation(oldOperations)
-			c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, key.ResourceType))
-
-			var curConditions []metav1.Condition
-
-			if curOp == nil {
-				curConditions = []metav1.Condition{}
+			if key.Namespace == "" {
+				c.logger.Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
+				// TODO process cluster scoped objects
 			} else {
-				curConditions = curOp.Status.Conditions
-			}
-
-			curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
-
-			if len(curConditions) == 0 {
-				// If no conditions are returned, that's the signal that the
-				// operation is complete
-				curOp = nil
-			} else if curOp == nil {
-				curOp = &v1alpha1.InFlightOperation{}
-				curOp.GenerateName = strings.ToLower(regObj.operationType)
-				curOp.Namespace = objMeta.GetNamespace()
-				curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
-				curOp.Status.OperationType = regObj.operationType
-			}
-
-			if curOp != nil {
-				curOp.Status.Conditions = curConditions
-			}
-
-			err = c.processOldAndNewOperations(ctx, curOp, oldOperations)
-			if err != nil {
-				return fmt.Errorf("failed to process operation: %v", err)
+				c.logger.Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
+				err := c.reconcileNamespacedScoped(ctx, obj, regObj, key.ResourceType)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
