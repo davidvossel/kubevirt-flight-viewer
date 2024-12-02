@@ -145,6 +145,7 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
 	controller, err := NewController(ctx, kubeClient, kvViewerClient,
 		kvViewerInformerFactory.Kubevirtflightviewer().V1alpha1().InFlightOperations(),
+		kvViewerInformerFactory.Kubevirtflightviewer().V1alpha1().InFlightClusterOperations(),
 		resourceInformers,
 	)
 	if err != nil {

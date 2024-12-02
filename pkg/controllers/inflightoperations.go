@@ -137,8 +137,10 @@ type Controller struct {
 	// fvclientset is a clientset for our own API group
 	fvclientset clientset.Interface
 
-	inflightOperationsLister listers.InFlightOperationLister
-	inflightOperationsSynced cache.InformerSynced
+	inflightClusterOperationsLister listers.InFlightClusterOperationLister
+	inflightClusterOperationsSynced cache.InformerSynced
+	inflightOperationsLister        listers.InFlightOperationLister
+	inflightOperationsSynced        cache.InformerSynced
 
 	resourceInformers map[string]cache.SharedIndexInformer
 
@@ -186,6 +188,51 @@ func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType str
 
 }
 
+func (c *Controller) processOldAndNewClusterOperations(ctx context.Context, curOp *v1alpha1.InFlightClusterOperation,
+	oldOps []v1alpha1.InFlightClusterOperation) error {
+
+	var err error
+	var origOp *v1alpha1.InFlightClusterOperation = nil
+	deleteOps := []v1alpha1.InFlightClusterOperation{}
+
+	if curOp == nil || curOp.Name == "" {
+		deleteOps = oldOps
+	} else if curOp.Name != "" {
+		origOp = curOp.DeepCopy()
+		for _, op := range oldOps {
+			if op.Name != curOp.Name {
+				deleteOps = append(deleteOps, op)
+			}
+		}
+	}
+
+	// Create or Update
+	if curOp != nil && curOp.Name == "" {
+		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightClusterOperations("").Create(ctx, curOp, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("error during creating operation: %v", err)
+		}
+	}
+
+	// Update Status
+	if origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
+		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightClusterOperations("").UpdateStatus(ctx, origOp, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("error during updating operation status: %v", err)
+		}
+	}
+
+	for _, op := range deleteOps {
+		err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightClusterOperations("").Delete(ctx, op.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return fmt.Errorf("error during deleting operation: %v", err)
+		}
+	}
+
+	return nil
+
+}
+
 func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1alpha1.InFlightOperation,
 	oldOps []v1alpha1.InFlightOperation) error {
 
@@ -229,6 +276,19 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 
 	return nil
 
+}
+
+func currentClusterOperation(ops []v1alpha1.InFlightClusterOperation) *v1alpha1.InFlightClusterOperation {
+	curIdx := -1
+	for i, op := range ops {
+		if curIdx == -1 || ops[curIdx].CreationTimestamp.Before(&op.CreationTimestamp) {
+			curIdx = i
+		}
+	}
+	if curIdx == -1 {
+		return nil
+	}
+	return ops[curIdx].DeepCopy()
 }
 
 func currentOperation(ops []v1alpha1.InFlightOperation) *v1alpha1.InFlightOperation {
@@ -284,6 +344,7 @@ func NewController(
 	kubeclientset kubernetes.Interface,
 	fvclientset clientset.Interface,
 	inflightOperationInformer informers.InFlightOperationInformer,
+	inflightClusterOperationInformer informers.InFlightClusterOperationInformer,
 	resourceInformers map[string]cache.SharedIndexInformer) (*Controller, error) {
 	logger := klog.FromContext(ctx)
 
@@ -304,14 +365,16 @@ func NewController(
 	)
 
 	controller := &Controller{
-		kubeclientset:            kubeclientset,
-		fvclientset:              fvclientset,
-		inflightOperationsLister: inflightOperationInformer.Lister(),
-		inflightOperationsSynced: inflightOperationInformer.Informer().HasSynced,
-		workqueue:                workqueue.NewNamedRateLimitingQueue(ratelimiter, "kubevirt-inflight-operation"),
-		recorder:                 recorder,
-		logger:                   logger,
-		resourceInformers:        resourceInformers,
+		kubeclientset:                   kubeclientset,
+		fvclientset:                     fvclientset,
+		inflightOperationsLister:        inflightOperationInformer.Lister(),
+		inflightOperationsSynced:        inflightOperationInformer.Informer().HasSynced,
+		inflightClusterOperationsLister: inflightClusterOperationInformer.Lister(),
+		inflightClusterOperationsSynced: inflightClusterOperationInformer.Informer().HasSynced,
+		workqueue:                       workqueue.NewNamedRateLimitingQueue(ratelimiter, "kubevirt-inflight-operation"),
+		recorder:                        recorder,
+		logger:                          logger,
+		resourceInformers:               resourceInformers,
 	}
 
 	logger.Info("Setting up event handlers")
@@ -429,6 +492,27 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
+func (c *Controller) getClusterOperationsForResource(ownerRef *metav1.OwnerReference, operationType string) ([]v1alpha1.InFlightClusterOperation, error) {
+	// TODO make custom indexer for this
+	allInFlightOperations, err := c.inflightClusterOperationsLister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+
+	relatedInFlightOperations := []v1alpha1.InFlightClusterOperation{}
+
+	for _, op := range allInFlightOperations {
+		if op.Status.OperationType != operationType {
+			continue
+		} else if !equality.Semantic.DeepEqual(&op.OwnerReferences[0], ownerRef) {
+			continue
+		}
+		relatedInFlightOperations = append(relatedInFlightOperations, *op.DeepCopy())
+	}
+
+	return relatedInFlightOperations, nil
+}
+
 func (c *Controller) getOperationsForResource(ownerRef *metav1.OwnerReference, namespace string, operationType string) ([]v1alpha1.InFlightOperation, error) {
 	// TODO make custom indexer for this
 	allInFlightOperations, err := c.inflightOperationsLister.InFlightOperations(namespace).List(labels.Everything())
@@ -448,6 +532,52 @@ func (c *Controller) getOperationsForResource(ownerRef *metav1.OwnerReference, n
 	}
 
 	return relatedInFlightOperations, nil
+}
+
+func (c *Controller) reconcileClusterScoped(ctx context.Context, obj interface{}, regObj registrationObj, resourceType string) error {
+	objMeta := obj.(metav1.Object)
+
+	ownerRef := metav1.NewControllerRef(objMeta, regObj.resourceGroupVersionKind)
+	ownerRef.BlockOwnerDeletion = ptr.To(false)
+
+	oldOperations, err := c.getClusterOperationsForResource(ownerRef, regObj.operationType)
+	if err != nil {
+		return err
+	}
+
+	curOp := currentClusterOperation(oldOperations)
+	//c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, resourceType))
+
+	var curConditions []metav1.Condition
+
+	if curOp == nil {
+		curConditions = []metav1.Condition{}
+	} else {
+		curConditions = curOp.Status.Conditions
+	}
+
+	curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
+
+	if len(curConditions) == 0 {
+		// If no conditions are returned, that's the signal that the
+		// operation is complete
+		curOp = nil
+	} else if curOp == nil {
+		curOp = &v1alpha1.InFlightClusterOperation{}
+		curOp.GenerateName = strings.ToLower(regObj.operationType)
+		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
+		curOp.Status.OperationType = regObj.operationType
+	}
+
+	if curOp != nil {
+		curOp.Status.Conditions = curConditions
+	}
+
+	err = c.processOldAndNewClusterOperations(ctx, curOp, oldOperations)
+	if err != nil {
+		return fmt.Errorf("failed to process operation: %v", err)
+	}
+	return nil
 }
 
 func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interface{}, regObj registrationObj, resourceType string) error {
@@ -530,7 +660,10 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 		if regObj.resourceType == key.ResourceType {
 			if key.Namespace == "" {
 				c.logger.Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
-				// TODO process cluster scoped objects
+				err := c.reconcileClusterScoped(ctx, obj, regObj, key.ResourceType)
+				if err != nil {
+					return err
+				}
 			} else {
 				c.logger.Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
 				err := c.reconcileNamespacedScoped(ctx, obj, regObj, key.ResourceType)
