@@ -26,9 +26,6 @@ import (
 
 const defaultResync = time.Second * 30
 
-func init() {
-}
-
 func cdiRestClient(cfg *restclient.Config) (restclient.Interface, error) {
 	shallowCopy := *cfg
 
@@ -48,7 +45,7 @@ func ocpMachineRestClient(cfg *restclient.Config) (restclient.Interface, error) 
 		return nil, err
 	}
 
-	return ocpClient.MachineV1().RESTClient(), nil
+	return ocpClient.MachineV1beta1().RESTClient(), nil
 }
 
 func kvRestClient(cfg *restclient.Config) (*restclient.RESTClient, error) {
