@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"golang.org/x/time/rate"
@@ -564,7 +563,7 @@ func (c *Controller) reconcileClusterScoped(ctx context.Context, obj interface{}
 		curOp = nil
 	} else if curOp == nil {
 		curOp = &v1alpha1.InFlightClusterOperation{}
-		curOp.GenerateName = strings.ToLower(regObj.operationType)
+		curOp.GenerateName = "ifco-"
 		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 		curOp.Status.OperationType = regObj.operationType
 	}
@@ -610,7 +609,7 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 		curOp = nil
 	} else if curOp == nil {
 		curOp = &v1alpha1.InFlightOperation{}
-		curOp.GenerateName = strings.ToLower(regObj.operationType)
+		curOp.GenerateName = "ifo-"
 		curOp.Namespace = objMeta.GetNamespace()
 		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 		curOp.Status.OperationType = regObj.operationType
