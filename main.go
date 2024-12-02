@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm/stopping"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/livemigration"
 	ocpmachinestarting "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachine/starting"
+	ocpmachineconfigupdating "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachineconfig/updating"
 	"k8s.io/kubevirt-flight-viewer/pkg/signals"
 
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
@@ -60,6 +61,7 @@ func init() {
 	starting.RegisterOperation()
 	ocpmachinestarting.RegisterOperation()
 	kvupdating.RegisterOperation()
+	ocpmachineconfigupdating.RegisterOperation()
 
 	// register flags
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")

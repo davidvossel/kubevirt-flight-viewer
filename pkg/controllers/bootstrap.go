@@ -17,7 +17,9 @@ import (
 	cdiv1 "kubevirt.io/containerized-data-importer-api/pkg/apis/core/v1beta1"
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	ocpclient "github.com/openshift/client-go/machine/clientset/versioned"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+	ocpmachineclient "github.com/openshift/client-go/machine/clientset/versioned"
+	ocpmachineconfigclient "github.com/openshift/client-go/machineconfiguration/clientset/versioned"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	clientset "k8s.io/kubevirt-flight-viewer/pkg/generated/clientset/versioned"
@@ -37,10 +39,21 @@ func cdiRestClient(cfg *restclient.Config) (restclient.Interface, error) {
 	return cdiClient.CdiV1beta1().RESTClient(), nil
 }
 
+func ocpMachineConfigRestClient(cfg *restclient.Config) (restclient.Interface, error) {
+	shallowCopy := *cfg
+
+	ocpClient, err := ocpmachineconfigclient.NewForConfig(&shallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
+	return ocpClient.MachineconfigurationV1().RESTClient(), nil
+}
+
 func ocpMachineRestClient(cfg *restclient.Config) (restclient.Interface, error) {
 	shallowCopy := *cfg
 
-	ocpClient, err := ocpclient.NewForConfig(&shallowCopy)
+	ocpClient, err := ocpmachineclient.NewForConfig(&shallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +132,17 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 	lw = cache.NewListWatchFromClient(machineRC, "machinesets", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["machinesets"] = cache.NewSharedIndexInformer(lw, &machinev1beta1.MachineSet{}, defaultResync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 
-	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
+	// OCP Machine Config Informers
+	machineConfigRC, err := ocpMachineConfigRestClient(cfg)
+	if err != nil {
+		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
+	}
 
+	// MachineConfigPool Informer
+	lw = cache.NewListWatchFromClient(machineConfigRC, "machineconfigpools", k8sv1.NamespaceAll, fields.Everything())
+	resourceInformers["machineconfigpools"] = cache.NewSharedIndexInformer(lw, &machineconfigv1.MachineConfigPool{}, defaultResync, cache.Indexers{})
+
+	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
 	controller, err := NewController(ctx, kubeClient, kvViewerClient,
 		kvViewerInformerFactory.Kubevirtflightviewer().V1alpha1().InFlightOperations(),
 		resourceInformers,
