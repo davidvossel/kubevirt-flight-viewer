@@ -1,10 +1,8 @@
-package updating
+package kubevirt
 
 import (
 	"context"
-	"fmt"
 
-	"k8s.io/klog/v2"
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -20,10 +18,12 @@ type operation struct {
 
 func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
 
-	logger := klog.FromContext(ctx)
+	//logger := klog.FromContext(ctx)
 
-	kv := obj.(*virtv1.KubeVirt)
-	logger.Info(fmt.Sprintf("processing starting operation for kv [%s]", kv.Name))
+	//kv := obj.(*virtv1.KubeVirt)
+
+	// TODO implement this
+	//	logger.Info(fmt.Sprintf("processing starting operation for kv [%s]", kv.Name))
 
 	return []metav1.Condition{}
 	/*

@@ -1,4 +1,4 @@
-package updating
+package ocpmachineconfig
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package starting
+package ocpmachine
 
 import (
 	//	"k8s.io/kubevirt-flight-viewer/pkg/controllers"

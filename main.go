@@ -21,11 +21,11 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	kvupdating "k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/kubevirt/updating"
+	kv "k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/kubevirt"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/livemigration"
-	ocpmachinestarting "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachine/starting"
-	ocpmachineconfigupdating "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachineconfig/updating"
+	ocpmachine "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachine"
+	ocpmachineconfig "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachineconfig"
 	csv "k8s.io/kubevirt-flight-viewer/pkg/registrars/olm/csv"
 	"k8s.io/kubevirt-flight-viewer/pkg/signals"
 
@@ -58,9 +58,9 @@ func init() {
 	// register operations
 	livemigration.RegisterOperation()
 	vm.RegisterOperation()
-	ocpmachinestarting.RegisterOperation()
-	kvupdating.RegisterOperation()
-	ocpmachineconfigupdating.RegisterOperation()
+	ocpmachine.RegisterOperation()
+	kv.RegisterOperation()
+	ocpmachineconfig.RegisterOperation()
 	csv.RegisterOperation()
 
 	// register flags
