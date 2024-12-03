@@ -22,12 +22,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
 	kvupdating "k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/kubevirt/updating"
-	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm/starting"
-	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm/stopping"
+	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/livemigration"
 	ocpmachinestarting "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachine/starting"
 	ocpmachineconfigupdating "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachineconfig/updating"
-	csvinstalling "k8s.io/kubevirt-flight-viewer/pkg/registrars/olm/csv/installing"
+	csv "k8s.io/kubevirt-flight-viewer/pkg/registrars/olm/csv"
 	"k8s.io/kubevirt-flight-viewer/pkg/signals"
 
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
@@ -58,12 +57,11 @@ func main() {
 func init() {
 	// register operations
 	livemigration.RegisterOperation()
-	stopping.RegisterOperation()
-	starting.RegisterOperation()
+	vm.RegisterOperation()
 	ocpmachinestarting.RegisterOperation()
 	kvupdating.RegisterOperation()
 	ocpmachineconfigupdating.RegisterOperation()
-	csvinstalling.RegisterOperation()
+	csv.RegisterOperation()
 
 	// register flags
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
