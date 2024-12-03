@@ -43,7 +43,6 @@ func (o *installingOperation) ProcessOperation(ctx context.Context, obj interfac
 	logger := klog.FromContext(ctx)
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
-	logger.Info(fmt.Sprintf("processing installing operation for csv [%s]", csv.Name))
 
 	switch csv.Status.Phase {
 	case olmv1alpha1.CSVPhaseSucceeded, olmv1alpha1.CSVPhaseFailed, olmv1alpha1.CSVPhaseDeleting, olmv1alpha1.CSVPhaseUnknown, olmv1alpha1.CSVPhaseReplacing:
@@ -51,6 +50,7 @@ func (o *installingOperation) ProcessOperation(ctx context.Context, obj interfac
 		return []metav1.Condition{}
 	}
 
+	logger.Info(fmt.Sprintf("processing installing operation for csv [%s]", csv.Name))
 	condition := meta.FindStatusCondition(conditions, "Progressing")
 	if condition == nil {
 		condition = &metav1.Condition{
@@ -58,7 +58,7 @@ func (o *installingOperation) ProcessOperation(ctx context.Context, obj interfac
 			ObservedGeneration: csv.Generation,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Installing",
-			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
+			Message:            fmt.Sprintf("phase [%s]: %s", string(csv.Status.Phase), csv.Status.Message),
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		}
 	}
@@ -76,14 +76,13 @@ func (o *deletingOperation) ProcessOperation(ctx context.Context, obj interface{
 	logger := klog.FromContext(ctx)
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
-	logger.Info(fmt.Sprintf("processing deleting operation for csv [%s]", csv.Name))
 
 	if csv.Status.Phase != olmv1alpha1.CSVPhaseDeleting {
-
 		// not deleting
 		return []metav1.Condition{}
 	}
 
+	logger.Info(fmt.Sprintf("processing deleting operation for csv [%s]", csv.Name))
 	condition := meta.FindStatusCondition(conditions, "Progressing")
 	if condition == nil {
 		condition = &metav1.Condition{
@@ -109,7 +108,6 @@ func (o *replacingOperation) ProcessOperation(ctx context.Context, obj interface
 	logger := klog.FromContext(ctx)
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
-	logger.Info(fmt.Sprintf("processing replacing operation for csv [%s]", csv.Name))
 
 	if csv.Status.Phase != olmv1alpha1.CSVPhaseReplacing {
 
@@ -117,6 +115,7 @@ func (o *replacingOperation) ProcessOperation(ctx context.Context, obj interface
 		return []metav1.Condition{}
 	}
 
+	logger.Info(fmt.Sprintf("processing replacing operation for csv [%s]", csv.Name))
 	condition := meta.FindStatusCondition(conditions, "Progressing")
 	if condition == nil {
 		condition = &metav1.Condition{
