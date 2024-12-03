@@ -376,17 +376,18 @@ func NewController(
 		resourceInformers:               resourceInformers,
 	}
 
-	logger.Info("Setting up event handlers")
-	// Set up an event handler for when InFlightOperation resources change
-	/*
-		inflightOperationInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-			AddFunc: controller.enqueueInFlightOperation,
-			UpdateFunc: func(old, new interface{}) {
-				controller.enqueueInFlightOperation(new)
-			},
-		})
-	*/
+	// This is a safety check to ensure we have an informer for every operation's resource type.
+	// This check prevents someone from registering a operation for a resource that this controller is not watching
+	for _, op := range registrations {
+		_, exists := resourceInformers[op.resourceType]
 
+		if !exists {
+			return nil, fmt.Errorf("no informer for resource type [%s]", op.resourceType)
+		}
+
+	}
+
+	logger.Info("Setting up event handlers")
 	for resourceType, informer := range resourceInformers {
 		_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
