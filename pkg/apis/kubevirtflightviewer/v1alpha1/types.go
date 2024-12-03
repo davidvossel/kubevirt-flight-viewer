@@ -32,7 +32,7 @@ import (
 // +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
 // +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
-// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".metadata.ownerReferences[0].message",description="Message"
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 type InFlightClusterOperation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -63,8 +63,7 @@ type InFlightClusterOperationList struct {
 // +kubebuilder:printcolumn:name="Resource_Kind",type="string",JSONPath=".metadata.ownerReferences[0].kind",description="Resource Kind"
 // +kubebuilder:printcolumn:name="Resource_Name",type="string",JSONPath=".metadata.ownerReferences[0].name",description="Resource Name"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age"
-// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".metadata.ownerReferences[0].message",description="Message"
-
+// +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 type InFlightOperation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

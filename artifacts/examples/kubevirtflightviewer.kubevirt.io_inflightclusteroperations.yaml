@@ -35,7 +35,7 @@ spec:
       name: Age
       type: date
     - description: Message
-      jsonPath: .metadata.ownerReferences[0].message
+      jsonPath: .status.conditions[0].message
       name: Message
       type: string
     name: v1alpha1

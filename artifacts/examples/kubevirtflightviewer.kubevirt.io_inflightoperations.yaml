@@ -35,12 +35,14 @@ spec:
       name: Age
       type: date
     - description: Message
-      jsonPath: .metadata.ownerReferences[0].message
+      jsonPath: .status.conditions[0].message
       name: Message
       type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:
+        description: InFlightOperation is a specification for a InFlightOperation
+          resource
         properties:
           apiVersion:
             description: |-
