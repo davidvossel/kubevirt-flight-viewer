@@ -34,6 +34,10 @@ spec:
       jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    - description: Message
+      jsonPath: .metadata.ownerReferences[0].message
+      name: Message
+      type: string
     name: v1alpha1
     schema:
       openAPIV3Schema:

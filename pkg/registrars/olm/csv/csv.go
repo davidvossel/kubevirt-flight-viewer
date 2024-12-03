@@ -17,6 +17,12 @@ import (
 
 func RegisterOperation() {
 
+	controllers.RegisterOperation(&replacingOperation{}, "Replacing", "clusterserviceversions", schema.GroupVersionKind{
+		Version: olmv1alpha1.SchemeGroupVersion.Version,
+		Group:   olmv1alpha1.SchemeGroupVersion.Group,
+		Kind:    "ClusterServiceVersion",
+	})
+
 	controllers.RegisterOperation(&deletingOperation{}, "Deleting", "clusterserviceversions", schema.GroupVersionKind{
 		Version: olmv1alpha1.SchemeGroupVersion.Version,
 		Group:   olmv1alpha1.SchemeGroupVersion.Group,
@@ -52,7 +58,7 @@ func (o *installingOperation) ProcessOperation(ctx context.Context, obj interfac
 			ObservedGeneration: csv.Generation,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Installing",
-			Message:            fmt.Sprintf("phase [%s] ", csv.Status.Phase),
+			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		}
 	}
@@ -85,7 +91,40 @@ func (o *deletingOperation) ProcessOperation(ctx context.Context, obj interface{
 			ObservedGeneration: csv.Generation,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Deleting",
-			Message:            fmt.Sprintf("phase [%s] ", csv.Status.Phase),
+			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
+			LastTransitionTime: metav1.NewTime(time.Now()),
+		}
+	}
+
+	meta.SetStatusCondition(&conditions, *condition)
+
+	return conditions
+}
+
+type replacingOperation struct {
+}
+
+func (o *replacingOperation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
+
+	logger := klog.FromContext(ctx)
+
+	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
+	logger.Info(fmt.Sprintf("processing replacing operation for csv [%s]", csv.Name))
+
+	if csv.Status.Phase != olmv1alpha1.CSVPhaseReplacing {
+
+		// not replacing
+		return []metav1.Condition{}
+	}
+
+	condition := meta.FindStatusCondition(conditions, "Progressing")
+	if condition == nil {
+		condition = &metav1.Condition{
+			Type:               "Progressing",
+			ObservedGeneration: csv.Generation,
+			Status:             metav1.ConditionTrue,
+			Reason:             "Deleting",
+			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
 			LastTransitionTime: metav1.NewTime(time.Now()),
 		}
 	}
