@@ -32,28 +32,30 @@ Below is an example of sample yaml for an inflight operation.
 apiVersion: kubevirtflightviewer.kubevirt.io/v1alpha1
 kind: InFlightOperation
 metadata:
-  creationTimestamp: "2024-12-03T21:17:27Z"
+  creationTimestamp: "2024-12-04T20:01:57Z"
   generateName: ifo-
   generation: 1
-  name: ifo-wnsw8
-  namespace: openshift-adp
+  name: ifo-dn94j
+  namespace: openshift-cnv
   ownerReferences:
   - apiVersion: operators.coreos.com/v1alpha1
     blockOwnerDeletion: false
     controller: true
     kind: ClusterServiceVersion
-    name: oadp-operator.v1.4.0
-    uid: a9711d47-e07f-4290-9fbf-63dbbabc7737
-  resourceVersion: "269372"
-  uid: f5e39704-f16b-4e62-9bb6-aa4ce899519d
+    name: kubevirt-hyperconverged-operator.4.16.5-78
+    uid: d00a1459-f741-46e8-b278-0aff9f5ac015
+  resourceVersion: "236164"
+  uid: 676dcb03-b78f-491d-bf61-2b29e13359d9
 status:
-  conditions:
-  - lastTransitionTime: "2024-12-03T21:17:27Z"
-    message: 'phase [Replacing]: being replaced by csv: oadp-operator.v1.4.1'
-    observedGeneration: 1
-    reason: Deleting
-    status: "True"
-    type: Progressing
-  operationType: Replacing
-
+  operationState:
+    message: 'phase [Succeeded]: install strategy completed with no errors'
+    reason: Installing
+    transitionState: Progressing
+  operationType: Installing
+  resourceReference:
+    apiVersion: operators.coreos.com/v1alpha1, Kind=ClusterServiceVersion
+    kind: ClusterServiceVersion
+    name: kubevirt-hyperconverged-operator.4.16.5-78
+    namespace: openshift-cnv
+    uid: d00a1459-f741-46e8-b278-0aff9f5ac015
 ```
