@@ -3,9 +3,9 @@ package kubevirt
 import (
 	"context"
 
+	"k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	virtv1 "kubevirt.io/api/core/v1"
 )
 
@@ -16,7 +16,7 @@ func RegisterOperation() {
 type operation struct {
 }
 
-func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
+func (o *operation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	//logger := klog.FromContext(ctx)
 
@@ -25,23 +25,5 @@ func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, condi
 	// TODO implement this
 	//	logger.Info(fmt.Sprintf("processing starting operation for kv [%s]", kv.Name))
 
-	return []metav1.Condition{}
-	/*
-		TODO check for updating and use similar logic to this vmi condition
-				condition := meta.FindStatusCondition(conditions, "Progressing")
-				if condition == nil {
-					condition = &metav1.Condition{
-						Type:               "Progressing",
-						ObservedGeneration: vmi.Generation,
-						Status:             metav1.ConditionTrue,
-						Reason:             "Starting",
-						Message:            fmt.Sprintf("Starting vm ", vmi.Name),
-						LastTransitionTime: metav1.NewTime(time.Now()),
-					}
-				}
-
-				meta.SetStatusCondition(&conditions, *condition)
-			return conditions
-	*/
-
+	return nil
 }

@@ -68,7 +68,7 @@ const (
 )
 
 type InFlightOperationRegistration interface {
-	ProcessOperation(context.Context, interface{}, []metav1.Condition) []metav1.Condition
+	ProcessOperation(context.Context, interface{}) *v1alpha1.InFlightOperationState
 }
 
 // TODO sync map or somehow prevent writes after init.
@@ -585,20 +585,11 @@ func (c *Controller) reconcileClusterScoped(ctx context.Context, obj interface{}
 	}
 
 	curOp := currentClusterOperation(oldOperations)
-	//c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, resourceType))
 
-	var curConditions []metav1.Condition
+	curState := regObj.registration.ProcessOperation(ctx, obj)
 
-	if curOp == nil {
-		curConditions = []metav1.Condition{}
-	} else {
-		curConditions = curOp.Status.Conditions
-	}
-
-	curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
-
-	if len(curConditions) == 0 {
-		// If no conditions are returned, that's the signal that the
+	if curState == nil {
+		// If state is returned, that's the signal that the
 		// operation is complete
 		curOp = nil
 	} else if curOp == nil {
@@ -616,7 +607,7 @@ func (c *Controller) reconcileClusterScoped(ctx context.Context, obj interface{}
 	}
 
 	if curOp != nil {
-		curOp.Status.Conditions = curConditions
+		curOp.Status.OperationState = curState
 	}
 
 	err = c.processOldAndNewClusterOperations(ctx, curOp, oldOperations)
@@ -638,19 +629,10 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 	}
 
 	curOp := currentOperation(oldOperations)
+	curState := regObj.registration.ProcessOperation(ctx, obj)
 
-	var curConditions []metav1.Condition
-
-	if curOp == nil {
-		curConditions = []metav1.Condition{}
-	} else {
-		curConditions = curOp.Status.Conditions
-	}
-
-	curConditions = regObj.registration.ProcessOperation(ctx, obj, curConditions)
-
-	if len(curConditions) == 0 {
-		// If no conditions are returned, that's the signal that the
+	if curState == nil {
+		// If no state is returned, that's the signal that the
 		// operation is complete
 		curOp = nil
 	} else if curOp == nil {
@@ -670,7 +652,7 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 	}
 
 	if curOp != nil {
-		curOp.Status.Conditions = curConditions
+		curOp.Status.OperationState = curState
 	}
 
 	err = c.processOldAndNewOperations(ctx, curOp, oldOperations)

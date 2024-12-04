@@ -4,15 +4,13 @@ import (
 	//	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/klog/v2"
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 
 	olmv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 )
 
 func RegisterOperation() {
@@ -38,97 +36,65 @@ func RegisterOperation() {
 type installingOperation struct {
 }
 
-func (o *installingOperation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
-
-	logger := klog.FromContext(ctx)
+func (o *installingOperation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
 
 	switch csv.Status.Phase {
 	case olmv1alpha1.CSVPhaseSucceeded, olmv1alpha1.CSVPhaseFailed, olmv1alpha1.CSVPhaseDeleting, olmv1alpha1.CSVPhaseUnknown, olmv1alpha1.CSVPhaseReplacing:
 		// not installing if in any of these phases
-		return []metav1.Condition{}
+		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	logger.Info(fmt.Sprintf("processing installing operation for csv [%s]", csv.Name))
-	condition := meta.FindStatusCondition(conditions, "Progressing")
-	if condition == nil {
-		condition = &metav1.Condition{
-			Type:               "Progressing",
-			ObservedGeneration: csv.Generation,
-			Status:             metav1.ConditionTrue,
-			Reason:             "Installing",
-			Message:            fmt.Sprintf("phase [%s]: %s", string(csv.Status.Phase), csv.Status.Message),
-			LastTransitionTime: metav1.NewTime(time.Now()),
-		}
+	return &v1alpha1.InFlightOperationState{
+		TransitionState: v1alpha1.TransitionStateProgressing,
+		Reason:          "Installing",
+		Message:         fmt.Sprintf("phase [%s]: %s", string(csv.Status.Phase), csv.Status.Message),
 	}
 
-	meta.SetStatusCondition(&conditions, *condition)
-
-	return conditions
 }
 
 type deletingOperation struct {
 }
 
-func (o *deletingOperation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
-
-	logger := klog.FromContext(ctx)
+func (o *deletingOperation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
 
 	if csv.Status.Phase != olmv1alpha1.CSVPhaseDeleting {
 		// not deleting
-		return []metav1.Condition{}
+		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	logger.Info(fmt.Sprintf("processing deleting operation for csv [%s]", csv.Name))
-	condition := meta.FindStatusCondition(conditions, "Progressing")
-	if condition == nil {
-		condition = &metav1.Condition{
-			Type:               "Progressing",
-			ObservedGeneration: csv.Generation,
-			Status:             metav1.ConditionTrue,
-			Reason:             "Deleting",
-			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
-			LastTransitionTime: metav1.NewTime(time.Now()),
-		}
+
+	return &v1alpha1.InFlightOperationState{
+		TransitionState: v1alpha1.TransitionStateProgressing,
+		Reason:          "Deleting",
+		Message:         fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
 	}
-
-	meta.SetStatusCondition(&conditions, *condition)
-
-	return conditions
 }
 
 type replacingOperation struct {
 }
 
-func (o *replacingOperation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
-
-	logger := klog.FromContext(ctx)
+func (o *replacingOperation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	csv := obj.(*olmv1alpha1.ClusterServiceVersion)
 
 	if csv.Status.Phase != olmv1alpha1.CSVPhaseReplacing {
-
 		// not replacing
-		return []metav1.Condition{}
+		return nil
 	}
 
+	logger := klog.FromContext(ctx)
 	logger.Info(fmt.Sprintf("processing replacing operation for csv [%s]", csv.Name))
-	condition := meta.FindStatusCondition(conditions, "Progressing")
-	if condition == nil {
-		condition = &metav1.Condition{
-			Type:               "Progressing",
-			ObservedGeneration: csv.Generation,
-			Status:             metav1.ConditionTrue,
-			Reason:             "Deleting",
-			Message:            fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
-			LastTransitionTime: metav1.NewTime(time.Now()),
-		}
+	return &v1alpha1.InFlightOperationState{
+		TransitionState: v1alpha1.TransitionStateProgressing,
+		Reason:          "Replacing",
+		Message:         fmt.Sprintf("phase [%s]: %s", csv.Status.Phase, csv.Status.Message),
 	}
-
-	meta.SetStatusCondition(&conditions, *condition)
-
-	return conditions
 }

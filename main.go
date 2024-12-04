@@ -23,7 +23,6 @@ import (
 	"k8s.io/klog/v2"
 	kv "k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/kubevirt"
 	"k8s.io/kubevirt-flight-viewer/pkg/registrars/kubevirt/vm"
-	"k8s.io/kubevirt-flight-viewer/pkg/registrars/livemigration"
 	ocpmachine "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachine"
 	ocpmachineconfig "k8s.io/kubevirt-flight-viewer/pkg/registrars/ocpmachineconfig"
 	csv "k8s.io/kubevirt-flight-viewer/pkg/registrars/olm/csv"
@@ -56,7 +55,6 @@ func main() {
 
 func init() {
 	// register operations
-	livemigration.RegisterOperation()
 	vm.RegisterOperation()
 	ocpmachine.RegisterOperation()
 	kv.RegisterOperation()

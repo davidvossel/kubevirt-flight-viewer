@@ -3,13 +3,11 @@ package ocpmachine
 import (
 	//	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 	"context"
-	"fmt"
 
-	"k8s.io/klog/v2"
+	"k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 
 	machinev1beta1 "github.com/openshift/api/machine/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -24,34 +22,19 @@ func RegisterOperation() {
 type startingOperation struct {
 }
 
-func (s *startingOperation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
-
-	logger := klog.FromContext(ctx)
+func (s *startingOperation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	machine := obj.(*machinev1beta1.Machine)
 
 	// return empty conditions when no starting is in progress
 	// This signals no in-flight starting is taking place
 	if machine.DeletionTimestamp == nil {
-		return []metav1.Condition{}
+		return nil
 	}
 
-	logger.V(4).Info(fmt.Sprintf("processing starting operation for machine [%s]", machine.Name))
-	/*
-		condition := meta.FindStatusCondition(conditions, "Progressing")
-		if condition == nil {
-			condition = &metav1.Condition{
-				Type:               "Progressing",
-				ObservedGeneration: machine.Generation,
-				Status:             metav1.ConditionTrue,
-				Reason:             "Stopping",
-				Message:            fmt.Sprintf("VM is terminating"),
-				LastTransitionTime: metav1.NewTime(time.Now()),
-			}
-		}
+	// TODO implement
+	//logger := klog.FromContext(ctx)
+	//logger.V(4).Info(fmt.Sprintf("processing starting operation for machine [%s]", machine.Name))
 
-		meta.SetStatusCondition(&conditions, *condition)
-	*/
-
-	return conditions
+	return nil
 }

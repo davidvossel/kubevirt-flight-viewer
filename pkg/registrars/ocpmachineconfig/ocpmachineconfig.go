@@ -3,14 +3,12 @@ package ocpmachineconfig
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubevirt-flight-viewer/pkg/apis/kubevirtflightviewer/v1alpha1"
 	"k8s.io/kubevirt-flight-viewer/pkg/controllers"
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -35,7 +33,7 @@ func findStatusCondition(conditions []machineconfigv1.MachineConfigPoolCondition
 	return nil
 }
 
-func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, conditions []metav1.Condition) []metav1.Condition {
+func (o *operation) ProcessOperation(ctx context.Context, obj interface{}) *v1alpha1.InFlightOperationState {
 
 	logger := klog.FromContext(ctx)
 
@@ -43,22 +41,13 @@ func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, condi
 
 	updatingCondition := findStatusCondition(pool.Status.Conditions, "Updating")
 	if updatingCondition != nil && string(updatingCondition.Status) == "True" {
-		condition := meta.FindStatusCondition(conditions, "Progressing")
-		if condition == nil {
-			condition = &metav1.Condition{
-				Type:               "Progressing",
-				ObservedGeneration: pool.Generation,
-				Status:             metav1.ConditionTrue,
-				Reason:             "Updating",
-				Message:            fmt.Sprintf("Updating machine config pool [%s] ", pool.Name),
-				LastTransitionTime: metav1.NewTime(time.Now()),
-			}
-		}
-
-		meta.SetStatusCondition(&conditions, *condition)
 		logger.V(4).Info(fmt.Sprintf("processing updating operation for machine config pool [%s]", pool.Name))
-		return conditions
+		return &v1alpha1.InFlightOperationState{
+			TransitionState: v1alpha1.TransitionStateProgressing,
+			Reason:          "Updating",
+			Message:         fmt.Sprintf("Updating machine config pool [%s] ", pool.Name),
+		}
 	}
 
-	return []metav1.Condition{}
+	return nil
 }
