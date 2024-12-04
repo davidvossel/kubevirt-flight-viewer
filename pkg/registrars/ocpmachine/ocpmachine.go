@@ -29,7 +29,6 @@ func (s *startingOperation) ProcessOperation(ctx context.Context, obj interface{
 	logger := klog.FromContext(ctx)
 
 	machine := obj.(*machinev1beta1.Machine)
-	logger.Info(fmt.Sprintf("processing starting operation for machine [%s]", machine.Name))
 
 	// return empty conditions when no starting is in progress
 	// This signals no in-flight starting is taking place
@@ -37,6 +36,7 @@ func (s *startingOperation) ProcessOperation(ctx context.Context, obj interface{
 		return []metav1.Condition{}
 	}
 
+	logger.V(4).Info(fmt.Sprintf("processing starting operation for machine [%s]", machine.Name))
 	/*
 		condition := meta.FindStatusCondition(conditions, "Progressing")
 		if condition == nil {

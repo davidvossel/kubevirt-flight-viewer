@@ -40,7 +40,6 @@ func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, condi
 	logger := klog.FromContext(ctx)
 
 	pool := obj.(*machineconfigv1.MachineConfigPool)
-	logger.Info(fmt.Sprintf("processing updating operation for machine config pool [%s]", pool.Name))
 
 	updatingCondition := findStatusCondition(pool.Status.Conditions, "Updating")
 	if updatingCondition != nil && string(updatingCondition.Status) == "True" {
@@ -57,6 +56,7 @@ func (o *operation) ProcessOperation(ctx context.Context, obj interface{}, condi
 		}
 
 		meta.SetStatusCondition(&conditions, *condition)
+		logger.V(4).Info(fmt.Sprintf("processing updating operation for machine config pool [%s]", pool.Name))
 		return conditions
 	}
 

@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -163,7 +164,7 @@ func (c *Controller) genericAddHandler(obj interface{}, resourceType string) {
 		return
 	}
 	c.workqueue.Add(key)
-	c.logger.Info(fmt.Sprintf("Add event for resource type %s", resourceType))
+	c.logger.V(4).Info(fmt.Sprintf("Add event for resource type %s", resourceType))
 }
 
 func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType string) {
@@ -183,7 +184,7 @@ func (c *Controller) genericUpdateHandler(old, cur interface{}, resourceType str
 		return
 	}
 	c.workqueue.Add(key)
-	c.logger.Info(fmt.Sprintf("Update event for resource type %s", resourceType))
+	c.logger.V(4).Info(fmt.Sprintf("Update event for resource type %s", resourceType))
 
 }
 
@@ -197,7 +198,10 @@ func (c *Controller) processOldAndNewClusterOperations(ctx context.Context, curO
 	if curOp == nil || curOp.Name == "" {
 		deleteOps = oldOps
 	} else if curOp.Name != "" {
-		origOp = curOp.DeepCopy()
+		origOp, err = c.inflightClusterOperationsLister.InFlightClusterOperations("").Get(curOp.Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 		for _, op := range oldOps {
 			if op.Name != curOp.Name {
 				deleteOps = append(deleteOps, op)
@@ -205,20 +209,29 @@ func (c *Controller) processOldAndNewClusterOperations(ctx context.Context, curO
 		}
 	}
 
-	// Create or Update
-	if curOp != nil && curOp.Name == "" {
+	// Create
+	if curOp != nil && curOp.Name == "" && origOp == nil {
 		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightClusterOperations("").Create(ctx, curOp, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("error during creating operation: %v", err)
 		}
+		c.logger.Info(fmt.Sprintf("created new ifco of operationType [%s] for resourceType: [%s] and resource name [%s]",
+			curOp.Status.OperationType,
+			curOp.Status.ResourceReference.Kind,
+			curOp.Status.ResourceReference.Name))
 	}
 
 	// Update Status
-	if origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
+	if curOp != nil && origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
 		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightClusterOperations("").UpdateStatus(ctx, origOp, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error during updating operation status: %v", err)
 		}
+		c.logger.Info(fmt.Sprintf("updated ifco [%s] of operationType [%s] for resourceType: [%s] and resource name [%s]",
+			curOp.Name,
+			curOp.Status.OperationType,
+			curOp.Status.ResourceReference.Kind,
+			curOp.Status.ResourceReference.Name))
 	}
 
 	for _, op := range deleteOps {
@@ -226,6 +239,11 @@ func (c *Controller) processOldAndNewClusterOperations(ctx context.Context, curO
 		if err != nil {
 			return fmt.Errorf("error during deleting operation: %v", err)
 		}
+		c.logger.Info(fmt.Sprintf("deleted ifco [%s] of operationType [%s] for resourceType: [%s] and resource name [%s]",
+			op.Name,
+			op.Status.OperationType,
+			op.Status.ResourceReference.Kind,
+			op.Status.ResourceReference.Name))
 	}
 
 	return nil
@@ -242,7 +260,10 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 	if curOp == nil || curOp.Name == "" {
 		deleteOps = oldOps
 	} else if curOp.Name != "" {
-		origOp = curOp.DeepCopy()
+		origOp, err = c.inflightOperationsLister.InFlightOperations(curOp.Namespace).Get(curOp.Name)
+		if err != nil && !errors.IsNotFound(err) {
+			return err
+		}
 		for _, op := range oldOps {
 			if op.Name != curOp.Name {
 				deleteOps = append(deleteOps, op)
@@ -251,19 +272,31 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 	}
 
 	// Create or Update
-	if curOp != nil && curOp.Name == "" {
+	if origOp == nil && curOp != nil && curOp.Name == "" {
 		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(curOp.Namespace).Create(ctx, curOp, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("error during creating operation: %v", err)
 		}
+
+		c.logger.Info(fmt.Sprintf("created new ifo of operationType [%s] for resourceType: [%s] and resource name [%s/%s]",
+			curOp.Status.OperationType,
+			curOp.Status.ResourceReference.Kind,
+			curOp.Status.ResourceReference.Namespace,
+			curOp.Status.ResourceReference.Name))
 	}
 
 	// Update Status
-	if origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
+	if curOp != nil && origOp != nil && !equality.Semantic.DeepEqual(origOp.Status, curOp.Status) {
 		curOp, err = c.fvclientset.KubevirtflightviewerV1alpha1().InFlightOperations(origOp.Namespace).UpdateStatus(ctx, origOp, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("error during updating operation status: %v", err)
 		}
+		c.logger.Info(fmt.Sprintf("updated ifo [%s] of operationType [%s] for resourceType: [%s] and resource name [%s/%s]",
+			curOp.Name,
+			curOp.Status.OperationType,
+			curOp.Status.ResourceReference.Kind,
+			curOp.Status.ResourceReference.Namespace,
+			curOp.Status.ResourceReference.Name))
 	}
 
 	for _, op := range deleteOps {
@@ -271,6 +304,12 @@ func (c *Controller) processOldAndNewOperations(ctx context.Context, curOp *v1al
 		if err != nil {
 			return fmt.Errorf("error during deleting operation: %v", err)
 		}
+		c.logger.Info(fmt.Sprintf("deleted ifo [%s] of operationType [%s] for resourceType: [%s] and resource name [%s/%s]",
+			op.Name,
+			op.Status.OperationType,
+			op.Status.ResourceReference.Kind,
+			op.Status.ResourceReference.Namespace,
+			op.Status.ResourceReference.Name))
 	}
 
 	return nil
@@ -334,7 +373,7 @@ func (c *Controller) genericDeleteHandler(obj interface{}, resourceType string) 
 		return
 	}
 	c.workqueue.Add(key)
-	c.logger.Info(fmt.Sprintf("Delete event for resource type %s", resourceType))
+	c.logger.V(4).Info(fmt.Sprintf("Delete event for resource type %s", resourceType))
 }
 
 // NewController returns a new flightviewer controller
@@ -476,7 +515,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 		// If no error occurs then we Forget this item so it does not
 		// get queued again until another change happens.
 		c.workqueue.Forget(key)
-		c.logger.Info("Successfully synced", "objectName", key)
+		c.logger.V(4).Info("Successfully synced", "objectName", key)
 		return true
 	}
 	// there was a failure so be sure to report it.  This method allows for
@@ -567,6 +606,13 @@ func (c *Controller) reconcileClusterScoped(ctx context.Context, obj interface{}
 		curOp.GenerateName = "ifco-"
 		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 		curOp.Status.OperationType = regObj.operationType
+
+		curOp.Status.ResourceReference = &v1alpha1.InFlightOperationResourceReference{
+			APIVersion: regObj.resourceGroupVersionKind.String(),
+			Kind:       regObj.resourceGroupVersionKind.Kind,
+			Name:       objMeta.GetName(),
+			UID:        objMeta.GetUID(),
+		}
 	}
 
 	if curOp != nil {
@@ -592,7 +638,6 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 	}
 
 	curOp := currentOperation(oldOperations)
-	//c.logger.Info(fmt.Sprintf("processing registration: %s for resource: %s", regObj.operationType, resourceType))
 
 	var curConditions []metav1.Condition
 
@@ -614,6 +659,14 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 		curOp.Namespace = objMeta.GetNamespace()
 		curOp.OwnerReferences = []metav1.OwnerReference{*ownerRef}
 		curOp.Status.OperationType = regObj.operationType
+
+		curOp.Status.ResourceReference = &v1alpha1.InFlightOperationResourceReference{
+			APIVersion: regObj.resourceGroupVersionKind.String(),
+			Kind:       regObj.resourceGroupVersionKind.Kind,
+			Name:       objMeta.GetName(),
+			Namespace:  objMeta.GetNamespace(),
+			UID:        objMeta.GetUID(),
+		}
 	}
 
 	if curOp != nil {
@@ -633,7 +686,7 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 	//logger := klog.LoggerWithValues(klog.FromContext(ctx), "objectRef", objectRef)
 
-	c.logger.Info(fmt.Sprintf("processing queue key: %s", keyJSONStr))
+	c.logger.V(4).Info(fmt.Sprintf("processing queue key: %s", keyJSONStr))
 
 	key, err := queueStringToKey(keyJSONStr)
 	if err != nil {
@@ -659,13 +712,13 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 	for _, regObj := range registrations {
 		if regObj.resourceType == key.ResourceType {
 			if key.Namespace == "" {
-				c.logger.Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
+				c.logger.V(4).Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
 				err := c.reconcileClusterScoped(ctx, obj, regObj, key.ResourceType)
 				if err != nil {
 					return err
 				}
 			} else {
-				c.logger.Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
+				c.logger.V(4).Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
 				err := c.reconcileNamespacedScoped(ctx, obj, regObj, key.ResourceType)
 				if err != nil {
 					return err

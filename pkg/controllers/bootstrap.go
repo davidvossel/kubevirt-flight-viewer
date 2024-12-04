@@ -177,7 +177,6 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 	lw = cache.NewListWatchFromClient(machineConfigRC, "machineconfigpools", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["machineconfigpools"] = cache.NewSharedIndexInformer(lw, &machineconfigv1.MachineConfigPool{}, defaultResync, cache.Indexers{})
 
-	// TODO START TESTING
 	// OLM Informers
 	olmRC, err := olmRestClient(cfg)
 	if err != nil {
@@ -188,8 +187,6 @@ func Bootstrap(ctx context.Context, cfg *restclient.Config) {
 
 	lw = cache.NewListWatchFromClient(olmRC, "clusterserviceversions", k8sv1.NamespaceAll, fields.Everything())
 	resourceInformers["clusterserviceversions"] = cache.NewSharedIndexInformer(lw, &olmv1alpha1.ClusterServiceVersion{}, defaultResync, cache.Indexers{})
-
-	// TODO END TESTING
 
 	kvViewerInformerFactory := informers.NewSharedInformerFactory(kvViewerClient, defaultResync)
 	controller, err := NewController(ctx, kubeClient, kvViewerClient,

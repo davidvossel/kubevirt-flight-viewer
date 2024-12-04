@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // +genclient
@@ -72,10 +73,28 @@ type InFlightOperation struct {
 	Status InFlightOperationStatus `json:"status"`
 }
 
+type InFlightOperationResourceReference struct {
+	// API version of the referent.
+	APIVersion string `json:"apiVersion"`
+	// Kind of the referent.
+	Kind string `json:"kind"`
+	// Name of the referent.
+	Name string `json:"name"`
+	// Namespace of the referent. Optional for cluster scoped resources
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+	// UID of the referent.
+	UID types.UID `json:"uid"`
+}
+
 // InFlightOperationStatus is the status for a InFlightOperation resource
 type InFlightOperationStatus struct {
 	// OperationType of operation
 	OperationType string `json:"operationType"`
+
+	// ResourceReference is the resource this operation is related to
+	ResourceReference *InFlightOperationResourceReference `json:"resourceReference"`
+
 	// Conditions represents the latest available observations of an inflight operation
 	// +optional
 	// +listType=map
