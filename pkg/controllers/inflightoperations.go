@@ -662,6 +662,29 @@ func (c *Controller) reconcileNamespacedScoped(ctx context.Context, obj interfac
 	return nil
 }
 
+func (c *Controller) reconcileRegistrations(ctx context.Context, obj interface{}, key *queueKey) error {
+
+	for _, regObj := range registrations {
+		if regObj.resourceType == key.ResourceType {
+			if key.Namespace == "" {
+				c.logger.V(4).Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
+				err := c.reconcileClusterScoped(ctx, obj, regObj, key.ResourceType)
+				if err != nil {
+					return err
+				}
+			} else {
+				c.logger.V(4).Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
+				err := c.reconcileNamespacedScoped(ctx, obj, regObj, key.ResourceType)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // reconcile compares the actual state with the desired, and attempts to
 // converge the two. It then updates the Status block of the InFlightOperation resource
 // with the current status of the resource.
@@ -691,23 +714,5 @@ func (c *Controller) reconcile(ctx context.Context, keyJSONStr string) error {
 		return nil
 	}
 
-	for _, regObj := range registrations {
-		if regObj.resourceType == key.ResourceType {
-			if key.Namespace == "" {
-				c.logger.V(4).Info(fmt.Sprintf("processing cluster scoped resource type [%s]", key.ResourceType))
-				err := c.reconcileClusterScoped(ctx, obj, regObj, key.ResourceType)
-				if err != nil {
-					return err
-				}
-			} else {
-				c.logger.V(4).Info(fmt.Sprintf("processing namespaced scoped resource type [%s]", key.ResourceType))
-				err := c.reconcileNamespacedScoped(ctx, obj, regObj, key.ResourceType)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
+	return c.reconcileRegistrations(ctx, obj, key)
 }
